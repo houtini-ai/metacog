@@ -1,5 +1,6 @@
 node_modules/
 .claude/metacog.state.json
+research/*.pdf
 *.tgz
 .DS_Store
 Thumbs.db

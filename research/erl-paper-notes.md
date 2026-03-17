@@ -2,7 +2,7 @@
 
 **Paper**: arxiv.org/abs/2602.13949 (Feb 2026)
 **Authors**: Taiwei Shi, Sihao Chen, Bowen Jiang, Linxin Song, Longqi Yang, Jieyu Zhao
-**PDF**: 2602.13949.pdf (saved locally)
+**PDF**: https://arxiv.org/pdf/2602.13949
 
 ## Core mechanism
 
