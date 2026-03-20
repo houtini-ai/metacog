@@ -9,7 +9,11 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
+import { homedir } from 'os';
+import { extractLearnings, persistLearnings } from './learnings.js';
+
+const ACTIVE_PATTERNS_PATH = join(homedir(), '.claude', '.metacog-active-patterns.json');
 
 const MAX_WINDOW_SIZE = 20;
 
@@ -97,9 +101,30 @@ export function createAction(hookInput, tokenEstimate) {
 /**
  * Append action to state, maintaining rolling window
  */
-export function appendAction(state, action, sessionId) {
-  // Reset state if session changed
+export function appendAction(state, action, sessionId, projectScope) {
+  // Reset state if session changed — extract learnings from prior session first
   if (state.session_id !== sessionId) {
+    if (state.session_id && state.turn_count > 5) {
+      try {
+        // Read active pattern IDs written by digest-inject at session start.
+        // These tell us which rules were injected — so we can emit suppression
+        // records for patterns that didn't fire (reinforcement tracking).
+        let activePatterns = [];
+        try {
+          const raw = readFileSync(ACTIVE_PATTERNS_PATH, 'utf-8');
+          const data = JSON.parse(raw);
+          if (data.sessionId === state.session_id) {
+            activePatterns = data.patterns || [];
+          }
+        } catch {
+          // No active patterns file — detection-only mode
+        }
+        const learnings = extractLearnings(state, activePatterns);
+        if (learnings.length) persistLearnings(learnings, projectScope);
+      } catch {
+        // Learning extraction failure is non-fatal
+      }
+    }
     state = emptyState();
     state.session_id = sessionId;
     state.session_start = new Date().toISOString();

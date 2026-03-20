@@ -49,8 +49,11 @@ async function main() {
     // Create action record
     const action = createAction(hookInput, tokenEstimate);
 
-    // Append to rolling window
-    state = appendAction(state, action, sessionId);
+    // Derive project scope from cwd (.claude dir within the project)
+    const projectScope = join(cwd, '.claude');
+
+    // Append to rolling window (passes project scope for per-project learnings)
+    state = appendAction(state, action, sessionId, projectScope);
 
     // --- Evaluate all 5 senses ---
     const signals = [];
