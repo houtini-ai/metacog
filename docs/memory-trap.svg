@@ -1,0 +1,66 @@
+<svg width="800" height="500" viewBox="0 0 800 500" xmlns="http://www.w3.org/2000/svg">
+  <title>The Memory Plugin Trap</title>
+  <desc>Flowchart showing the circular failure of AI memory plugins where agents repeat mistakes despite logging them.</desc>
+  <style>
+    text { font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace; font-size: 14px; fill: #ffffff; }
+    .secondary { fill: #94a3b8; font-size: 12px; }
+    .heading { font-weight: bold; font-size: 24px; fill: #ffffff; }
+    .caption { fill: #94a3b8; font-size: 13px; text-anchor: middle; }
+    .cyan { stroke: #06b6d4; fill: none; }
+    .gray { stroke: #94a3b8; fill: none; }
+    .red { stroke: #ef4444; fill: none; }
+  </style>
+
+  <rect width="800" height="500" fill="#0f172a" />
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#06b6d4" />
+    </marker>
+  </defs>
+
+  <!-- Node 1: Top -->
+  <g transform="translate(300, 40)">
+    <rect width="200" height="50" rx="8" class="cyan" stroke-width="2" />
+    <text x="100" y="30" text-anchor="middle">Agent makes mistake</text>
+  </g>
+
+  <!-- Node 2: Right -->
+  <g transform="translate(560, 210)">
+    <rect width="200" height="80" rx="8" class="gray" stroke-width="1" />
+    <text x="100" y="35" text-anchor="middle" class="secondary">Activity logged</text>
+    <text x="100" y="55" text-anchor="middle" class="secondary">to database</text>
+    <path d="M 90 65 a 10 3 0 1 0 20 0 a 10 3 0 1 0 -20 0 m 0 0 v 8 c 0 3 10 3 20 0 v -8" class="gray" />
+  </g>
+
+  <!-- Node 3: Bottom -->
+  <g transform="translate(280, 380)">
+    <rect width="240" height="80" rx="8" class="gray" stroke-width="1" />
+    <text x="120" y="30" text-anchor="middle" class="secondary">Next session: dump</text>
+    <text x="120" y="50" text-anchor="middle" class="secondary">logs into context</text>
+    <path d="M 110 60 h 15 v 12 h -15 z M 115 63 h 15 v 12 h -15 z" class="gray" />
+  </g>
+
+  <!-- Node 4: Left -->
+  <g transform="translate(40, 210)">
+    <rect width="200" height="80" rx="8" class="red" stroke-width="2" />
+    <text x="100" y="35" text-anchor="middle">Agent ignores</text>
+    <text x="100" y="55" text-anchor="middle">the noise</text>
+    <path d="M 95 65 l 10 10 m 0 -10 l -10 10" stroke="#ef4444" stroke-width="2" />
+  </g>
+
+  <!-- Center Piece -->
+  <g transform="translate(400, 250)">
+    <text x="0" y="0" text-anchor="middle" class="heading">Never learns</text>
+    <path d="M -20 20 a 25 25 0 1 1 40 0 m -5 -5 l 5 5 l -5 5" class="cyan" stroke-width="2" />
+  </g>
+
+  <!-- Connectors -->
+  <path d="M 500 65 Q 660 65 660 210" class="cyan" stroke-width="2" marker-end="url(#arrow)" />
+  <path d="M 660 290 Q 660 420 520 420" class="cyan" stroke-width="2" marker-end="url(#arrow)" />
+  <path d="M 280 420 Q 140 420 140 290" class="cyan" stroke-width="2" marker-end="url(#arrow)" />
+  <path d="M 140 210 Q 140 65 300 65" class="cyan" stroke-width="2" marker-end="url(#arrow)" />
+
+  <!-- Caption -->
+  <text x="400" y="490" class="caption">Memory plugins treat context like an archive. The agent drowns in reports and repeats the mistake.</text>
+</svg>

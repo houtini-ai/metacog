@@ -1,0 +1,61 @@
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+  <title>The 3-Layer Nervous System - Metacog</title>
+  <desc>Diagram showing Proprioception, Nociception, and Reinforcement Tracking layers.</desc>
+  <style>
+    text { font-family: 'Courier New', Courier, monospace; letter-spacing: -0.5px; }
+    .title { font-size: 18px; font-weight: bold; fill: #ffffff; text-transform: uppercase; }
+    .sub { font-size: 14px; fill: #94a3b8; }
+    .label { font-size: 13px; fill: #ffffff; }
+    .meta { font-size: 12px; fill: #94a3b8; }
+    .layer-1 { fill: #06b6d4; stroke: #06b6d4; fill-opacity: 0.1; stroke-width: 2; }
+    .layer-2 { fill: #f59e0b; stroke: #f59e0b; fill-opacity: 0.1; stroke-width: 2; }
+    .layer-3 { fill: #22c55e; stroke: #22c55e; fill-opacity: 0.1; stroke-width: 2; }
+    .arrow { stroke: #475569; stroke-width: 2; fill: none; }
+  </style>
+
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="600" fill="#0f172a" />
+
+  <!-- Layer 1: Proprioception -->
+  <g transform="translate(40, 40)">
+    <rect width="720" height="140" rx="8" class="layer-1" />
+    <text x="20" y="35" class="title">Layer 1 - Proprioception</text>
+    <text x="20" y="55" class="sub">Silent when normal. Signals when abnormal.</text>
+    <text x="20" y="95" class="label">Sensors: [O2] [Chronos] [Nociception] [Spatial] [Vestibular]</text>
+    <text x="20" y="120" class="meta">PostToolUse hook - fires after every tool call</text>
+    <text x="520" y="120" class="label">Cost: 0 tokens (when normal)</text>
+  </g>
+
+  <!-- Connection 1 -->
+  <path d="M 400 180 L 400 212" class="arrow" marker-end="url(#head)" />
+  <text x="410" y="205" class="meta">Threshold crossed</text>
+
+  <!-- Layer 2: Nociception -->
+  <g transform="translate(40, 220)">
+    <rect width="720" height="140" rx="8" class="layer-2" />
+    <text x="20" y="35" class="title" style="fill: #f59e0b;">Layer 2 - Nociception</text>
+    <text x="20" y="55" class="sub">Escalating interventions when stuck</text>
+    <text x="20" y="95" class="label" font-size="16">1. Socratic ➔ 2. Directive ➔ 3. User alert</text>
+  </g>
+
+  <!-- Connection 2 -->
+  <path d="M 400 360 L 400 392" class="arrow" marker-end="url(#head)" />
+
+  <!-- Layer 3: Reinforcement Tracking -->
+  <g transform="translate(40, 400)">
+    <rect width="720" height="140" rx="8" class="layer-3" />
+    <text x="20" y="35" class="title" style="fill: #22c55e;">Layer 3 - Reinforcement Tracking</text>
+    <text x="20" y="55" class="sub">Cross-session learning that rewards success</text>
+    <text x="20" y="95" class="label">Detections + Suppressions ➔ Evidence ➔ Confidence</text>
+    <text x="20" y="120" class="meta">UserPromptSubmit hook - injects once per session</text>
+  </g>
+
+  <!-- Branding/Title -->
+  <text x="400" y="25" text-anchor="middle" class="meta" style="fill: #475569; letter-spacing: 2px;">THE 3-LAYER NERVOUS SYSTEM // METACOG</text>
+</svg>

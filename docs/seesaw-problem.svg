@@ -1,0 +1,75 @@
+<svg viewBox="0 0 800 450" xmlns="http://www.w3.org/2000/svg">
+  <title>The Seesaw Problem: AI Time-Decay Diagram</title>
+  <desc>A technical diagram showing how time-decay cycles punish successful AI rules.</desc>
+  <style>
+    text { font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace; fill: #ffffff; }
+    .title { font-size: 20px; font-weight: bold; text-anchor: middle; fill: #06b6d4; }
+    .label { font-size: 13px; text-anchor: middle; }
+    .small { font-size: 11px; fill: #94a3b8; }
+    .cyan { fill: #06b6d4; }
+    .red { fill: #ef4444; }
+    .ghost { fill: #ef4444; fill-opacity: 0.2; }
+    .stroke-cyan { stroke: #06b6d4; stroke-width: 2; fill: none; }
+    .stroke-red { stroke: #ef4444; stroke-width: 2; fill: none; }
+    .connector { stroke: #334155; stroke-width: 1; fill: none; }
+  </style>
+
+  <!-- Background -->
+  <rect width="800" height="450" fill="#0f172a" />
+  
+  <text x="400" y="40" class="title">THE SEESAW PROBLEM</text>
+
+  <!-- Phase 1: Bug & Rule -->
+  <g transform="translate(120, 100)">
+    <circle r="12" class="red" />
+    <rect x="-30" y="40" width="60" height="20" rx="4" class="cyan" />
+    <text y="-25" class="label">1. Bug Detected</text>
+    <text y="75" class="label">Rule Created</text>
+  </g>
+
+  <!-- Phase 2: Success -->
+  <g transform="translate(300, 100)">
+    <path d="M-10,0 L-2,8 L10,-8" class="stroke-cyan" />
+    <circle r="10" cy="50" class="ghost" />
+    <text y="-25" class="label">2. Rule Works</text>
+    <text y="75" class="label">Bug Suppressed</text>
+  </g>
+
+  <!-- Phase 3: Decay -->
+  <g transform="translate(480, 100)">
+    <circle r="12" class="stroke-cyan" />
+    <path d="M0,0 L0,-6 M0,0 L4,2" class="stroke-cyan" />
+    <rect x="-25" y="45" width="50" height="8" rx="2" fill="#334155" />
+    <rect x="-25" y="45" width="10" height="8" rx="2" class="red" />
+    <text y="-25" class="label">3. Time Passes</text>
+    <text y="75" class="label">Confidence Decays</text>
+    <text y="92" class="small">"No bug = stale rule?"</text>
+  </g>
+
+  <!-- Phase 4: Failure -->
+  <g transform="translate(660, 100)">
+    <rect x="-25" y="40" width="50" height="20" rx="4" class="stroke-cyan" stroke-dasharray="4" />
+    <circle r="12" class="red" />
+    <text y="-25" class="label">4. Rule Purged</text>
+    <text y="75" class="label">Bug Returns</text>
+  </g>
+
+  <!-- Connectors -->
+  <path d="M160,100 H260 M340,100 H440 M520,100 H620" class="connector" />
+  <path d="M660,60 Q400,-10 120,60" class="stroke-red" stroke-dasharray="5" fill="none" />
+  <text x="400" y="25" class="label" fill="#ef4444">ENDLESS CYCLE</text>
+
+  <!-- Seesaw -->
+  <g transform="translate(400, 360)">
+    <polygon points="0,0 -20,40 20,40" fill="#334155" />
+    <!-- Tilted Beam: Time is heavy (left), Confidence is light (right) -->
+    <line x1="-150" y1="30" x2="150" y2="-30" stroke="#94a3b8" stroke-width="4" />
+    <text x="-120" y="60" class="label" font-weight="bold">TIME ELAPSED</text>
+    <text x="120" y="-10" class="label" font-weight="bold" fill="#06b6d4">RULE STRENGTH</text>
+  </g>
+
+  <!-- Footer -->
+  <text x="400" y="430" class="small" style="fill: #94a3b8;">
+    Standard time-decay punishes rules for working. The better the rule, the faster it dies.
+  </text>
+</svg>
