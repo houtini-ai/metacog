@@ -12,17 +12,17 @@ So, the premise here is pretty simple. AI agents have no body. They process inpu
 
 Metacog doesn't make agents smarter. It gives them something to feel with.
 
-It runs as a pair of Claude Code hooks — one fires after every tool call (the nervous system), the other fires once per session (the memory). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short proprioceptive signal gets injected into the agent's context. Not a command. Just awareness. The agent's own reasoning decides what to do about it.
+It runs as a pair of Claude Code hooks -one fires after every tool call (the nervous system), the other fires once per session (the memory). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short proprioceptive signal gets injected into the agent's context. Not a command. Just awareness. The agent's own reasoning decides what to do about it.
 
 ### The five senses
 
 | Sense | Signal | What it detects |
 |-------|--------|-----------------|
-| **O2** | Context trend | Token velocity spikes — the agent is consuming context unsustainably |
-| **Chronos** | Temporal awareness | Time and step count since last user interaction — the agent has no internal clock |
-| **Nociception** | Error friction | Repeated similar errors — the agent is stuck but hasn't recognised it |
-| **Spatial** | Blast radius | File dependency count after writes — the agent is modifying a module imported by 14 other files |
-| **Vestibular** | Action diversity | Repeated identical actions — the agent is going in circles without triggering errors |
+| **O2** | Context trend | Token velocity spikes -the agent is consuming context unsustainably |
+| **Chronos** | Temporal awareness | Time and step count since last user interaction -the agent has no internal clock |
+| **Nociception** | Error friction | Repeated similar errors -the agent is stuck but hasn't recognised it |
+| **Spatial** | Blast radius | File dependency count after writes -the agent is modifying a module imported by 14 other files |
+| **Vestibular** | Action diversity | Repeated identical actions -the agent is going in circles without triggering errors |
 
 ### Three layers
 
@@ -36,7 +36,7 @@ Consider summarising findings before proceeding.
 ```
 
 **Layer 2: Nociception** (triggered by Layer 1 thresholds)
-When error friction crosses critical thresholds, forces a cognitive shift. Escalating interventions — socratic first, then directive, then user escalation.
+When error friction crosses critical thresholds, forces a cognitive shift. Escalating interventions -socratic first, then directive, then user escalation.
 
 ```
 [NOCICEPTIVE INTERRUPT]
@@ -48,13 +48,13 @@ Before taking another action:
 ```
 
 **Layer 3: Reinforcement tracking** (cross-session learning)
-This is the interesting bit. When the nervous system detects a failure pattern, it records it. But here's what makes this different from a simple activity log — it also tracks when a known failure pattern *doesn't* fire.
+This is the interesting bit. When the nervous system detects a failure pattern, it records it. But here's what makes this different from a simple activity log -it also tracks when a known failure pattern *doesn't* fire.
 
 If a rule was injected at the start of a session, and the failure it targets never appeared during that session, that's not nothing. That's evidence the rule is working. The system records a "suppression" alongside the original "detection." Both count as evidence. Both increase confidence.
 
 Naive time-decay penalises success. If you learn "don't retry the same error" and then you stop retrying the same error, a decay-based system sees the rule going stale and eventually prunes it. Then the behaviour regresses, the rule fires again, confidence climbs, the behaviour improves, the rule decays. Seesaw.
 
-Reinforcement tracking breaks the seesaw. Rules that successfully suppress their target failure get reinforced by their own success. Only truly dormant rules — patterns that haven't been active at all for months — decay.
+Reinforcement tracking breaks the seesaw. Rules that successfully suppress their target failure get reinforced by their own success. Only truly dormant rules -patterns that haven't been active at all for months -decay.
 
 ---
 
@@ -67,8 +67,8 @@ npx @houtini/metacog --install
 ```
 
 This adds both hooks to your global Claude Code settings (`~/.claude/settings.json`):
-- `PostToolUse` — the nervous system (fires after every tool call)
-- `UserPromptSubmit` — the digest injector (fires once per session, injects learned rules)
+- `PostToolUse` -the nervous system (fires after every tool call)
+- `UserPromptSubmit` -the digest injector (fires once per session, injects learned rules)
 
 For per-project installation:
 
@@ -128,25 +128,25 @@ Zero dependencies. Nothing to build. The source is the distribution.
 
 Here's the data flow. It's worth understanding because it's the thing that makes this more than a glorified activity log.
 
-**Session start** — the `UserPromptSubmit` hook fires. It compiles all learnings (global + project-scoped) into a digest, injects it as a system-reminder, and writes a marker file listing which pattern IDs were injected. This marker is the key — it's how the system knows which rules were "active" during the session.
+**Session start** -the `UserPromptSubmit` hook fires. It compiles all learnings (global + project-scoped) into a digest, injects it as a system-reminder, and writes a marker file listing which pattern IDs were injected. This marker is the key -it's how the system knows which rules were "active" during the session.
 
-**During the session** — the `PostToolUse` hook fires after every tool call. It records actions into a rolling 20-item window. Silent when normal. Signals when abnormal. No learning happens here — this is pure proprioception.
+**During the session** -the `PostToolUse` hook fires after every tool call. It records actions into a rolling 20-item window. Silent when normal. Signals when abnormal. No learning happens here -this is pure proprioception.
 
-**Session end** — when the next session starts, the first tool call triggers a session ID change. Before resetting state, the system:
+**Session end** -when the next session starts, the first tool call triggers a session ID change. Before resetting state, the system:
 1. Reads the active patterns marker from the previous session
 2. Runs all pattern detectors against the session state
 3. For each detector that fires: emits a **detection** (the failure happened)
 4. For each detector that *doesn't* fire but was in the active set: emits a **suppression** (the rule prevented the failure)
-5. Persists both to the JSONL log — global and project-scoped
+5. Persists both to the JSONL log -global and project-scoped
 
-**Compilation** — next session's digest compilation merges detections and suppressions. Both increase total evidence. Suppressions get a slight confidence bonus (effectiveness ratio). Only rules with zero activity for 60+ days decay. Pruning happens at 120 days for low-evidence rules.
+**Compilation** -next session's digest compilation merges detections and suppressions. Both increase total evidence. Suppressions get a slight confidence bonus (effectiveness ratio). Only rules with zero activity for 60+ days decay. Pruning happens at 120 days for low-evidence rules.
 
 ### Per-project scoping
 
 Learnings are stored at two levels:
 
-- **Global** (`~/.claude/metacog-learnings.jsonl`) — patterns that apply everywhere
-- **Project** (`<project>/.claude/metacog-learnings.jsonl`) — patterns specific to this codebase
+- **Global** (`~/.claude/metacog-learnings.jsonl`) -patterns that apply everywhere
+- **Project** (`<project>/.claude/metacog-learnings.jsonl`) -patterns specific to this codebase
 
 At digest compilation time, both are merged. Project-scoped entries take precedence where they overlap. This means a pattern that only happens in one repo builds evidence specifically for that repo, without polluting the global set.
 
@@ -201,13 +201,13 @@ Metacog works with zero configuration. To tune thresholds, create `.claude/metac
 
 ## The backstory
 
-This project started with a question about metacognition — thinking about thinking. Could we make AI agents reflect on their own behaviour? But the deeper we got, the more we realised the real problem isn't that agents think badly. It's that they can't feel anything.
+This project started with a question about metacognition -thinking about thinking. Could we make AI agents reflect on their own behaviour? But the deeper we got, the more we realised the real problem isn't that agents think badly. It's that they can't feel anything.
 
-Traditional "memory" plugins for AI agents record what the agent did — episodic memory stored in SQLite, retrieved by semantic search. This has problems. Stale data. Token tax on every retrieval. And no actual learning — replaying actions isn't reflection, it's a search engine over a diary.
+Traditional "memory" plugins for AI agents record what the agent did -episodic memory stored in SQLite, retrieved by semantic search. This has problems. Stale data. Token tax on every retrieval. And no actual learning -replaying actions isn't reflection, it's a search engine over a diary.
 
 The proprioception metaphor turned out to be the right one. You don't avoid walking into walls because a "Collision Detection Module" writes a report about a recent impact. You avoid walls because your nervous system provides immediate, low-latency, non-verbal feedback about your physical state.
 
-But proprioception alone only works within a session. The agent wakes up fresh every time. So we built reinforcement tracking on top — a way for the agent to carry forward behavioural lessons across sessions, with a confidence model that actually rewards rules for working rather than punishing them for not failing.
+But proprioception alone only works within a session. The agent wakes up fresh every time. So we built reinforcement tracking on top -a way for the agent to carry forward behavioural lessons across sessions, with a confidence model that actually rewards rules for working rather than punishing them for not failing.
 
 The combination of real-time proprioception and cross-session reinforcement tracking is, as far as we can tell, novel. Most agent memory systems are either activity logs (what happened) or skill libraries (what to do). This is neither. It's a record of what goes wrong, what prevents it from going wrong, and how confident we should be in each lesson.
 
@@ -217,11 +217,11 @@ See `SPEC.md` for the full design specification and theoretical foundation.
 
 ## Design principles
 
-- **No news is good news** — signals only appear when values deviate from baseline. The absence of a signal means everything is fine
-- **Trends over absolutes** — measures velocity and trajectory, not absolute values. We can't know the exact context limit, so we track "filling rapidly" not "88% full"
-- **Inform, don't command** — provides awareness, trusts the agent's reasoning. Only at extreme thresholds does the system force a cognitive shift
-- **Graceful degradation** — if the hooks fail, the agent is just normal Claude. Nothing breaks
-- **Reinforcement over decay** — rules that work get stronger, not stale
+- **No news is good news** -signals only appear when values deviate from baseline. The absence of a signal means everything is fine
+- **Trends over absolutes** -measures velocity and trajectory, not absolute values. We can't know the exact context limit, so we track "filling rapidly" not "88% full"
+- **Inform, don't command** -provides awareness, trusts the agent's reasoning. Only at extreme thresholds does the system force a cognitive shift
+- **Graceful degradation** -if the hooks fail, the agent is just normal Claude. Nothing breaks
+- **Reinforcement over decay** -rules that work get stronger, not stale
 
 ## Requirements
 
