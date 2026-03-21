@@ -74,7 +74,7 @@ Metacog runs as a pair of Claude Code hooks. One fires after every tool call (th
 ### The three layers
 
 <div align="center">
-  <img src="docs/three-layers.svg" alt="The 3-Layer Nervous System" width="700">
+  <img src="docs/five-senses.png" alt="Five Proprioceptive Senses" width="700">
 </div>
 
 **Layer 1: Proprioception** (always on, near-zero cost)
@@ -110,7 +110,7 @@ Everyone's building memory plugins - activity logs, vector databases, episodic r
 The problem is fundamental. They treat the agent's context like a filing cabinet. The agent drowns in the report and walks into the same trap anyway.
 
 <div align="center">
-  <img src="docs/memory-trap.svg" alt="The Memory Plugin Trap" width="700">
+  <img src="docs/memory-trap.png" alt="The Memory Plugin Trap" width="700">
 </div>
 
 Metacog doesn't replay what happened. It tracks what works, what doesn't, and gets more confident over time about rules that actually prevent failures.
@@ -120,13 +120,13 @@ Metacog doesn't replay what happened. It tracks what works, what doesn't, and ge
 Standard time-decay actively punishes success. If the agent learns "don't retry the same error three times" and stops doing it, the decay system sees the rule going stale and prunes it. The agent forgets. The behaviour regresses.
 
 <div align="center">
-  <img src="docs/seesaw-problem.svg" alt="The Seesaw Problem" width="700">
+  <img src="docs/seesaw-problem.png" alt="The Seesaw Problem" width="700">
 </div>
 
 Metacog inverts this. When a known pattern *doesn't* fire during a session where its rule was active, that's a **suppression** - evidence the rule is working. Both detections and suppressions increase confidence. Only truly dormant rules decay.
 
 <div align="center">
-  <img src="docs/reinforcement-tracking.svg" alt="Reinforcement Tracking" width="700">
+  <img src="docs/reinforcement-tracking.png" alt="Reinforcement Tracking" width="700">
 </div>
 
 ---
