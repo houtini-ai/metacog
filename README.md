@@ -7,7 +7,7 @@
   <img src="assets/icon.png" alt="metacog" width="128">
 </p>
 
-**Memory plugins don't work.** They log what your agent did, dump it back next session, and the agent walks into the same traps anyway. Metacog takes a different approach - instead of replaying the past, it gives your Claude Code agent real-time awareness of its own state. Five senses detect context overflow, stuck loops, repeated errors, and circular actions before they spiral. And when problems resolve, the system learns what fixed them - building rules that get stronger over time, not stale. Zero dependencies. One-command install. Open source.
+Metacog takes a different approach to a memory mcp - instead of replaying the past, it gives your Claude Code agent real-time awareness of its own state. Five senses detect context overflow, stuck loops, repeated errors, and circular actions before they spiral. And when problems resolve, the system learns what fixed them - building rules that get stronger over time, not stale. Zero dependencies. One-command install. Open source.
 
 ---
 
