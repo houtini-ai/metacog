@@ -13,17 +13,25 @@
 
 ## Install
 
-```
-/plugin install metacog@houtini-ai
+```bash
+npx @houtini/metacog --install
 ```
 
-That's it. Metacog runs silently in the background. You'll only see output when something is abnormal.
+That's it. The installer registers both hooks into your Claude Code settings. Metacog runs silently in the background from that point on - you'll only see output when something is abnormal.
+
+### Project-scoped install
+
+```bash
+npx @houtini/metacog --install --project
+```
+
+Installs into `.claude/settings.json` in the current project instead of globally.
 
 ### Development install
 
 ```bash
 git clone https://github.com/houtini-ai/metacog
-claude --plugin-dir /path/to/metacog
+cd metacog && npx @houtini/metacog --install
 ```
 
 ---
