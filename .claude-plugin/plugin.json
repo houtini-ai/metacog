@@ -1,7 +1,7 @@
 {
   "name": "metacog",
   "version": "0.3.0",
-  "description": "Proprioceptive nervous system for AI coding agents — gives Claude sensory awareness of its operational state",
+  "description": "Catches stuck loops, context overload, and repeated errors before your agent spirals. Learns what works across sessions instead of dumping memory logs the agent ignores.",
   "author": {
     "name": "Houtini AI",
     "email": "npm@richardbaxter.co",
