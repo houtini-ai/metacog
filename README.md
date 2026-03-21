@@ -22,14 +22,44 @@ That's it. Metacog runs silently in the background. You'll only see output when 
 ### Development install
 
 ```bash
+git clone https://github.com/houtini-ai/metacog
 claude --plugin-dir /path/to/metacog
 ```
 
 ---
 
+## What are Claude Code hooks?
+
+Hooks are shell commands that Claude Code runs automatically at specific moments during a session. They're the plugin system's way of letting tools react to what the agent is doing, without the agent having to ask for it.
+
+There are a few hook events that matter here:
+
+| Hook event | When it fires | What it's for |
+|------------|--------------|---------------|
+| `PostToolUse` | After the agent uses any tool (Read, Write, Bash, etc.) | Monitoring, validation, side effects |
+| `UserPromptSubmit` | When you send a message | Injecting context, session setup |
+| `PreToolUse` | Before a tool runs | Blocking dangerous actions |
+| `Stop` | When the agent finishes responding | Cleanup, verification |
+
+Hooks communicate back to Claude via JSON on stdout:
+
+```json
+{
+  "continue": true,
+  "suppressOutput": false,
+  "systemMessage": "This message appears in the agent's context"
+}
+```
+
+If a hook outputs nothing and exits 0, it's invisible. Zero token cost. Zero latency (well, near-zero). This is what makes hooks different from MCP servers - they can be completely silent when there's nothing to say.
+
+Metacog uses two hooks: `PostToolUse` for the nervous system and `UserPromptSubmit` for injecting learned rules at session start.
+
+---
+
 ## What it does
 
-Metacog is a Claude Code plugin with two hooks. One fires after every tool call (the nervous system), the other fires once per session (the reinforcement injector). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short signal appears in the agent's context. Not a command - just awareness.
+Metacog runs as a pair of Claude Code hooks. One fires after every tool call (the nervous system), the other fires once per session (the reinforcement injector). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short signal appears in the agent's context. Not a command - just awareness. The agent's own reasoning decides what to do about it.
 
 ### The five senses
 
@@ -98,34 +128,6 @@ Metacog inverts this. When a known pattern *doesn't* fire during a session where
 <div align="center">
   <img src="docs/reinforcement-tracking.svg" alt="Reinforcement Tracking" width="700">
 </div>
-
----
-
-## How hooks work in Claude Code
-
-If you're new to Claude Code hooks, here's the quick version:
-
-**Hooks** are shell commands that Claude Code runs at specific points during a session. They can inject messages into the agent's context or block actions. They're configured in your settings or loaded via plugins.
-
-Metacog uses two hook events:
-
-| Hook | When it fires | What metacog does |
-|------|--------------|-------------------|
-| `PostToolUse` | After every tool call | Evaluates 5 senses, signals if abnormal |
-| `UserPromptSubmit` | When you send a message | Injects learned behavioural rules (first message only) |
-
-Hooks communicate via **stdout JSON**:
-```json
-{
-  "continue": true,
-  "suppressOutput": false,
-  "systemMessage": "Message injected into agent context"
-}
-```
-
-Exit 0 with no output = silent (zero cost). Exit 0 with JSON = message injected. Exit 2 = blocking error.
-
-Metacog's hooks are silent when everything is normal. You'll forget it's there until it saves you from a loop.
 
 ---
 
@@ -284,7 +286,7 @@ metacog/
 ## Requirements
 
 - Node.js 18+
-- Claude Code with hooks/plugin support
+- Claude Code with plugin support
 
 ## Backstory
 
