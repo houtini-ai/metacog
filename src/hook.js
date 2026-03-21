@@ -17,8 +17,9 @@
  *   - Graceful degradation (any error → exit 0, agent is just normal Claude)
  */
 
-import { readState, writeState, estimateTokens, createAction, appendAction } from './lib/state.js';
+import { readState, writeState, estimateTokensFromHook, createAction, appendAction } from './lib/state.js';
 import { loadConfig } from './lib/config.js';
+import { extractMotorLearning, persistLearnings } from './lib/learnings.js';
 import { evaluate as evaluateO2 } from './senses/o2.js';
 import { evaluate as evaluateChronos } from './senses/chronos.js';
 import { evaluate as evaluateNociception, checkResolution } from './senses/nociception.js';
@@ -36,15 +37,14 @@ async function main() {
     const sessionId = hookInput.session_id || 'unknown';
 
     // Paths
-    const stateDir = join(cwd, '.claude');
-    const statePath = join(stateDir, 'metacog.state.json');
+    const statePath = join(cwd, '.claude', 'metacog.state.json');
 
     // Load config and state
     const config = loadConfig(cwd);
     let state = readState(statePath);
 
-    // Estimate tokens from the tool result
-    const tokenEstimate = estimateTokens(hookInput.tool_result);
+    // Estimate tokens from both tool input and result (both consume context)
+    const tokenEstimate = estimateTokensFromHook(hookInput);
 
     // Create action record
     const action = createAction(hookInput, tokenEstimate);
@@ -53,7 +53,7 @@ async function main() {
     const projectScope = join(cwd, '.claude');
 
     // Append to rolling window (passes project scope for per-project learnings)
-    state = appendAction(state, action, sessionId, projectScope);
+    state = appendAction(state, action, sessionId, projectScope, config);
 
     // --- Evaluate all 5 senses ---
     const signals = [];
@@ -78,11 +78,18 @@ async function main() {
     const vestibularSignal = evaluateVestibular(state, action, config.proprioception);
     if (vestibularSignal) signals.push({ sense: 'Vestibular', message: vestibularSignal });
 
-    // --- Check for nociceptive resolution (motor learning trigger) ---
+    // --- Check for nociceptive resolution (Layer 3: Motor Learning) ---
     if (checkResolution(state)) {
-      // Nociceptive event resolved - reset escalation
+      // Nociceptive event resolved - extract what changed and persist the lesson
+      try {
+        const motorLearning = extractMotorLearning(state);
+        if (motorLearning) {
+          persistLearnings([motorLearning], projectScope);
+        }
+      } catch {
+        // Motor learning extraction is non-fatal
+      }
       state.nociception.escalation_level = 0;
-      // TODO: Phase 4 - trigger boundary micro-reflection here
     }
 
     // --- Decide what to output ---

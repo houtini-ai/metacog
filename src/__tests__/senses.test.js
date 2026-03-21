@@ -1,8 +1,9 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { readState, createAction, appendAction, estimateTokens } from '../lib/state.js';
+import { readState, createAction, appendAction, estimateTokens, estimateTokensFromHook } from '../lib/state.js';
 import { DEFAULTS } from '../lib/config.js';
+import { extractLearnings, buildPatternDetectors, extractMotorLearning } from '../lib/learnings.js';
 import { evaluate as evaluateO2 } from '../senses/o2.js';
 import { evaluate as evaluateNociception } from '../senses/nociception.js';
 import { evaluate as evaluateChronos } from '../senses/chronos.js';
@@ -192,5 +193,214 @@ describe('Token Estimation', () => {
   it('should handle null/undefined', () => {
     assert.equal(estimateTokens(null), 0);
     assert.equal(estimateTokens(undefined), 0);
+  });
+});
+
+// --- Fix #1: estimateTokensFromHook ---
+describe('estimateTokensFromHook', () => {
+  it('should estimate from both tool_input and tool_result', () => {
+    const hookInput = {
+      tool_input: 'a'.repeat(400),   // 100 tokens
+      tool_result: 'b'.repeat(800),  // 200 tokens
+    };
+    const estimate = estimateTokensFromHook(hookInput);
+    assert.equal(estimate, 300);
+  });
+
+  it('should estimate from tool_input only when tool_result is missing', () => {
+    const hookInput = { tool_input: 'a'.repeat(400) };
+    const estimate = estimateTokensFromHook(hookInput);
+    assert.equal(estimate, 100);
+  });
+
+  it('should estimate from tool_result only when tool_input is missing', () => {
+    const hookInput = { tool_result: 'b'.repeat(800) };
+    const estimate = estimateTokensFromHook(hookInput);
+    assert.equal(estimate, 200);
+  });
+
+  it('should fall back to full payload when both fields are empty', () => {
+    const hookInput = { tool_name: 'Read', some_field: 'x'.repeat(80) };
+    const estimate = estimateTokensFromHook(hookInput);
+    assert.ok(estimate > 0, 'Should estimate from full payload');
+  });
+
+  it('should handle null/undefined input', () => {
+    assert.equal(estimateTokensFromHook(null), 0);
+    assert.equal(estimateTokensFromHook(undefined), 0);
+  });
+
+  it('should handle object tool_input', () => {
+    const hookInput = { tool_input: { file_path: '/foo/bar.js', content: 'x'.repeat(400) } };
+    const estimate = estimateTokensFromHook(hookInput);
+    assert.ok(estimate > 0, 'Should stringify objects');
+  });
+});
+
+// --- Fix #2: Motor Learning ---
+describe('Motor Learning - extractMotorLearning', () => {
+  it('should extract learning when errors resolve', () => {
+    const actions = [
+      makeAction({ exit_status: 'success', tool_name: 'Read', target_resource: '/src/a.ts' }),
+      makeAction({ exit_status: 'error', tool_name: 'Edit', target_resource: '/src/b.ts', error_signature: 'syntax error unexpected token' }),
+      makeAction({ exit_status: 'error', tool_name: 'Edit', target_resource: '/src/b.ts', error_signature: 'syntax error unexpected token' }),
+      makeAction({ exit_status: 'error', tool_name: 'Edit', target_resource: '/src/b.ts', error_signature: 'syntax error unexpected token' }),
+      makeAction({ exit_status: 'success', tool_name: 'Read', target_resource: '/src/docs.md' }),
+      makeAction({ exit_status: 'success', tool_name: 'Edit', target_resource: '/src/b.ts' }),
+    ];
+    const state = buildState(actions, {
+      nociception: { escalation_level: 2, cooldown_remaining: 0, last_intervention_at: 3 },
+    });
+    const learning = extractMotorLearning(state);
+    assert.ok(learning, 'Should produce a motor learning');
+    assert.equal(learning.type, 'motor_learning');
+    assert.equal(learning.category, 'Resolved Failures');
+    assert.equal(learning.failure_window.error_count, 3);
+    assert.ok(learning.lesson.includes('resolution came from'), `Lesson should describe resolution: ${learning.lesson}`);
+  });
+
+  it('should return null when no errors in window', () => {
+    const actions = [
+      makeAction({ exit_status: 'success' }),
+      makeAction({ exit_status: 'success' }),
+      makeAction({ exit_status: 'success' }),
+    ];
+    const state = buildState(actions);
+    assert.equal(extractMotorLearning(state), null);
+  });
+
+  it('should return null when errors are still ongoing (no resolution)', () => {
+    const actions = [
+      makeAction({ exit_status: 'error', error_signature: 'err' }),
+      makeAction({ exit_status: 'error', error_signature: 'err' }),
+      makeAction({ exit_status: 'error', error_signature: 'err' }),
+    ];
+    const state = buildState(actions);
+    // resolutionStart would be after last error = actions.length, no resolution actions
+    assert.equal(extractMotorLearning(state), null);
+  });
+
+  it('should detect tool switch as resolution strategy', () => {
+    const actions = [
+      makeAction({ exit_status: 'error', tool_name: 'Bash', target_resource: 'npm test', error_signature: 'test failed' }),
+      makeAction({ exit_status: 'error', tool_name: 'Bash', target_resource: 'npm test', error_signature: 'test failed' }),
+      makeAction({ exit_status: 'success', tool_name: 'Read', target_resource: '/src/config.js' }),
+    ];
+    const state = buildState(actions);
+    const learning = extractMotorLearning(state);
+    assert.ok(learning, 'Should produce learning');
+    assert.ok(learning.lesson.includes('switching from'), `Should detect tool switch: ${learning.lesson}`);
+  });
+
+  it('should return null with fewer than 2 failure actions', () => {
+    const actions = [
+      makeAction({ exit_status: 'error', error_signature: 'err' }),
+      makeAction({ exit_status: 'success' }),
+    ];
+    const state = buildState(actions);
+    assert.equal(extractMotorLearning(state), null);
+  });
+});
+
+// --- Fix #3: Suppression preconditions ---
+describe('Suppression Preconditions', () => {
+  it('should NOT emit circular_search suppression when no reads occurred', () => {
+    // Session with only write/execute actions — circular_search precondition not met
+    const actions = [
+      makeAction({ tool_name: 'Edit', action_type: 'write' }),
+      makeAction({ tool_name: 'Bash', action_type: 'execute' }),
+      makeAction({ tool_name: 'Edit', action_type: 'write' }),
+    ];
+    const state = buildState(actions, { turn_count: 10 });
+    const learnings = extractLearnings(state, ['circular_search']);
+    const suppression = learnings.find(l => l.pattern === 'circular_search' && l.type === 'suppression');
+    assert.equal(suppression, undefined, 'Should not emit suppression when precondition not met');
+  });
+
+  it('should emit circular_search suppression when reads occurred but no circular pattern', () => {
+    // Session with diverse reads — precondition met, pattern didn't fire
+    const actions = [
+      makeAction({ tool_name: 'Read', action_type: 'read', target_resource: '/a.ts' }),
+      makeAction({ tool_name: 'Edit', action_type: 'write', target_resource: '/a.ts' }),
+      makeAction({ tool_name: 'Read', action_type: 'read', target_resource: '/b.ts' }),
+      makeAction({ tool_name: 'Bash', action_type: 'execute' }),
+    ];
+    const state = buildState(actions, { turn_count: 10 });
+    const learnings = extractLearnings(state, ['circular_search']);
+    const suppression = learnings.find(l => l.pattern === 'circular_search' && l.type === 'suppression');
+    assert.ok(suppression, 'Should emit suppression when precondition met but pattern did not fire');
+  });
+
+  it('should NOT emit error_loop suppression when no errors occurred', () => {
+    const actions = [
+      makeAction({ exit_status: 'success' }),
+      makeAction({ exit_status: 'success' }),
+    ];
+    const state = buildState(actions, { turn_count: 10 });
+    const learnings = extractLearnings(state, ['error_loop']);
+    const suppression = learnings.find(l => l.pattern === 'error_loop' && l.type === 'suppression');
+    assert.equal(suppression, undefined, 'Should not emit suppression when no errors happened');
+  });
+
+  it('should NOT emit long_autonomous_run suppression for short sessions', () => {
+    const actions = [makeAction(), makeAction()];
+    const state = buildState(actions, { turn_count: 5 });
+    const learnings = extractLearnings(state, ['long_autonomous_run']);
+    const suppression = learnings.find(l => l.pattern === 'long_autonomous_run' && l.type === 'suppression');
+    assert.equal(suppression, undefined, 'Should not emit suppression for very short sessions');
+  });
+});
+
+// --- Fix #5: Configurable detectors ---
+describe('Configurable Pattern Detectors', () => {
+  it('should build detectors with default thresholds', () => {
+    const detectors = buildPatternDetectors();
+    assert.equal(detectors.length, 5, 'Should have all 5 built-in detectors');
+  });
+
+  it('should exclude disabled detectors', () => {
+    const detectors = buildPatternDetectors({
+      circular_search: { enabled: false },
+      error_loop: { enabled: false },
+    });
+    assert.equal(detectors.length, 3, 'Should exclude 2 disabled detectors');
+    const ids = detectors.map(d => d.id);
+    assert.ok(!ids.includes('circular_search'), 'circular_search should be excluded');
+    assert.ok(!ids.includes('error_loop'), 'error_loop should be excluded');
+  });
+
+  it('should respect custom thresholds', () => {
+    const detectors = buildPatternDetectors({
+      long_autonomous_run: { turn_threshold: 100 },
+    });
+    const lar = detectors.find(d => d.id === 'long_autonomous_run');
+    assert.ok(lar, 'long_autonomous_run should exist');
+    // Should NOT fire at 60 turns with threshold=100
+    const state60 = buildState([], { turn_count: 60 });
+    assert.equal(lar.detect(state60), null, 'Should not fire at 60 with threshold=100');
+    // Should fire at 101
+    const state101 = buildState([], { turn_count: 101 });
+    const result = lar.detect(state101);
+    assert.ok(result, 'Should fire at 101 with threshold=100');
+    assert.ok(result.lesson.includes('100'), 'Lesson should mention custom threshold');
+  });
+
+  it('should pass custom detectors to extractLearnings', () => {
+    const customDetector = {
+      id: 'test_custom',
+      relevantTools: [],
+      preconditionMet() { return true; },
+      detect(state) {
+        if (state.turn_count > 3) {
+          return { pattern: 'test_custom', category: 'Test', lesson: 'Test lesson' };
+        }
+        return null;
+      },
+    };
+    const state = buildState([makeAction(), makeAction(), makeAction(), makeAction()], { turn_count: 5 });
+    const learnings = extractLearnings(state, [], [customDetector]);
+    const detection = learnings.find(l => l.pattern === 'test_custom');
+    assert.ok(detection, 'Custom detector should fire');
+    assert.equal(detection.type, 'detection');
   });
 });

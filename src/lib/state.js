@@ -11,7 +11,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { homedir } from 'os';
-import { extractLearnings, persistLearnings } from './learnings.js';
+import { extractLearnings, persistLearnings, buildPatternDetectors, loadCustomDetectors } from './learnings.js';
 
 const ACTIVE_PATTERNS_PATH = join(homedir(), '.claude', '.metacog-active-patterns.json');
 
@@ -76,6 +76,23 @@ export function estimateTokens(text) {
 }
 
 /**
+ * Estimate total token cost of a hook invocation.
+ * Both tool_input and tool_result consume context window space,
+ * so we sum both to get the true velocity signal for O2.
+ */
+export function estimateTokensFromHook(hookInput) {
+  if (!hookInput) return 0;
+  let total = 0;
+  total += estimateTokens(hookInput.tool_input);
+  total += estimateTokens(hookInput.tool_result);
+  // If both were empty/missing, estimate from the full payload as fallback
+  if (total === 0) {
+    total = estimateTokens(hookInput);
+  }
+  return total;
+}
+
+/**
  * Create an action record from hook input
  */
 export function createAction(hookInput, tokenEstimate) {
@@ -101,7 +118,7 @@ export function createAction(hookInput, tokenEstimate) {
 /**
  * Append action to state, maintaining rolling window
  */
-export function appendAction(state, action, sessionId, projectScope) {
+export function appendAction(state, action, sessionId, projectScope, config = null) {
   // Reset state if session changed — extract learnings from prior session first
   if (state.session_id !== sessionId) {
     if (state.session_id && state.turn_count > 5) {
@@ -119,7 +136,9 @@ export function appendAction(state, action, sessionId, projectScope) {
         } catch {
           // No active patterns file — detection-only mode
         }
-        const learnings = extractLearnings(state, activePatterns);
+        // Build config-driven detectors + any custom user detectors
+        const detectors = buildDetectorsFromConfig(config);
+        const learnings = extractLearnings(state, activePatterns, detectors);
         if (learnings.length) persistLearnings(learnings, projectScope);
       } catch {
         // Learning extraction failure is non-fatal
@@ -156,6 +175,16 @@ export function appendAction(state, action, sessionId, projectScope) {
   }
 
   return state;
+}
+
+/**
+ * Build the full set of detectors from config (built-in + custom).
+ */
+function buildDetectorsFromConfig(config) {
+  if (!config) return null; // null = use default PATTERN_DETECTORS
+  const builtIn = buildPatternDetectors(config.patterns || {});
+  const custom = loadCustomDetectors(config.custom_patterns_path);
+  return [...builtIn, ...custom];
 }
 
 // --- Internal helpers ---

@@ -36,6 +36,34 @@ const DEFAULTS = {
     escalation_cooldown: 5,        // turns of silence after intervention
     reflex_arc_threshold: 8,       // consecutive failures before hard escalation
   },
+  // Pattern detector thresholds (used by cross-session learning)
+  patterns: {
+    circular_search: {
+      enabled: true,
+      consecutive_runs: 2,         // consecutive read-type runs to trigger
+    },
+    repeated_file_read: {
+      enabled: true,
+      repeat_threshold: 3,         // reads of same file to trigger
+    },
+    error_loop: {
+      enabled: true,
+      recent_window: 10,           // actions to look back
+      min_errors: 4,               // minimum errors in window
+      max_unique_sigs: 2,          // max unique signatures (fewer = more stuck)
+    },
+    long_autonomous_run: {
+      enabled: true,
+      turn_threshold: 50,          // tool calls before triggering
+    },
+    write_heavy_session: {
+      enabled: true,
+      min_writes: 10,              // minimum writes before checking ratio
+      read_ratio: 0.5,             // reads must be >= writes * ratio
+    },
+  },
+  // Path to a JSON file containing user-defined pattern detectors
+  custom_patterns_path: null,
 };
 
 /**

@@ -1,5 +1,8 @@
 node_modules/
 .claude/metacog.state.json
+.claude/metacog-learnings.jsonl
+.metacog-session-marker
+.metacog-active-patterns.json
 research/*.pdf
 *.tgz
 .DS_Store

@@ -1,18 +1,22 @@
 # @houtini/metacog
 
-**AI coding agents are brains in vats.** They can reason about almost anything, but they can't feel their context window filling up, don't know how long they've been working, can't sense when they're going in circles, and have no peripheral vision of how their changes affect the wider codebase.
+[![npm version](https://img.shields.io/npm/v/@houtini/metacog.svg?style=flat-square)](https://www.npmjs.com/package/@houtini/metacog)
+[![MCP Registry](https://img.shields.io/badge/MCP-Registry-blue?style=flat-square)](https://registry.modelcontextprotocol.io)
+[![Known Vulnerabilities](https://snyk.io/test/github/houtini-ai/metacog/badge.svg)](https://snyk.io/test/github/houtini-ai/metacog)
 
-Metacog gives them a nervous system. Five proprioceptive senses. Cross-session reinforcement tracking. Two hooks. Zero dependencies.
+I spent weeks building a memory system for my Claude Code setup before I realised I was solving the wrong problem entirely. Everyone's building memory plugins right now - activity logs, vector databases, episodic recall. And I did the same thing, because it seemed obvious. But the agent just ignored the memories and walked into the same traps anyway.
+
+So I built a nervous system instead. Five proprioceptive senses. Cross-session reinforcement tracking. Two hooks. Zero dependencies.
 
 ---
 
 ## Why not memory?
 
-So, the trend right now is memory. Everyone's building memory plugins for AI agents - activity logs, episodic memory in SQLite, vector databases, semantic search over past sessions. And my first instinct was the same. I figured I'd pipe all the session data into a database, summarise it, feed it back in next time, and the agent would just... remember.
+So, the trend right now is memory. Claude-Mem, Memsearch, Agent Memory MCP - there's a new one every week. They all do roughly the same thing: capture what the agent did, compress it, store it in SQLite or a vector store, then dump the relevant bits back into context next time around.
 
 But here's the thing. If memory was the real problem, the AI companies would have solved it already. Anthropic, OpenAI, Google - they're not short on engineers. Models already learn from our inputs, collectively, across millions of conversations. But we have to wait for the next model release to benefit from that. And even then, it's generic. It's everyone's patterns averaged together, not yours.
 
-The problem with memory plugins is more fundamental than stale data or token costs (though those are real problems too). It's that they treat the agent's context window like a filing cabinet. When a new session starts, they dump a stack of past observations into the prompt and hope the agent pays attention. It's like trying to teach someone to ride a bike by making them read a physics textbook while they're pedalling. The agent drowns in the report and walks right into the same trap.
+The problem with memory plugins is more fundamental than stale data or token costs (though those are real). It's that they treat the agent's context window like a filing cabinet. When a new session starts, they dump a stack of past observations into the prompt and hope the agent pays attention. It's like trying to teach someone to ride a bike by making them read a physics textbook while they're pedalling. The agent drowns in the report and walks right into the same trap.
 
 <div align="center">
   <img src="docs/memory-trap.svg" alt="The Memory Plugin Trap - a cycle of mistake, log, dump, ignore that never learns" width="700">
@@ -22,13 +26,11 @@ What I actually needed wasn't better memory. It was something closer to a nervou
 
 And then, for the cross-session piece, not a memory dump but something that tunes your Claude experience based on the unique challenges you've actually faced. Not generic best practices from a training corpus. Your patterns. Your failure modes. Your projects.
 
-That's what Metacog does.
-
 ---
 
 ## What it actually does
 
-Metacog runs as a pair of Claude Code hooks. One fires after every tool call (the nervous system), the other fires once per session (the reinforcement injector). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short proprioceptive signal gets injected into the agent's context. Not a command. Just awareness. The agent's own reasoning decides what to do about it.
+Metacog runs as a pair of Claude Code hooks. One fires after every tool call (the nervous system), the other fires once per session (the reinforcement injector). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short signal gets injected into the agent's context. Not a command. Just awareness. The agent's own reasoning decides what to do about it.
 
 ### The five senses
 
@@ -56,7 +58,7 @@ Consider summarising findings before proceeding.
 ```
 
 **Layer 2: Nociception** (triggered by Layer 1 thresholds)
-When error friction crosses critical thresholds, it forces a cognitive shift. Escalating interventions - socratic questioning first, then directive instructions, then flagging the user.
+When error friction crosses critical thresholds, it forces a cognitive shift. Escalating interventions - Socratic questioning first, then directive instructions, then flagging the user. It can feel aggressive. But honestly, if the agent has hit four consecutive similar errors, being polite about it isn't helping anyone.
 
 ```
 [NOCICEPTIVE INTERRUPT]
@@ -67,8 +69,8 @@ Before taking another action:
 3. Execute that investigation before writing any more code
 ```
 
-**Layer 3: Reinforcement tracking** (cross-session learning)
-This is the interesting bit, and it's where Metacog diverges from every memory plugin I've seen.
+**Layer 3: Motor Learning + Reinforcement tracking** (cross-session learning)
+When a nociceptive event resolves - the agent stops failing and finds a working approach - the system extracts what changed. Did it switch tools? Change targets? Read documentation? The delta between the failure cluster and the resolution action gets persisted as a heuristic lesson. These motor learnings, combined with the reinforcement tracking system below, are what make Metacog diverge from every memory plugin I've seen.
 
 ---
 
@@ -100,7 +102,7 @@ When the nervous system detects a failure pattern, it records a **detection** - 
 
 Rules that successfully suppress their target failure get reinforced by their own success. Only truly dormant rules - patterns that haven't been active at all for 60+ days - decay. And even then, slowly.
 
-This is what makes Metacog different from a memory plugin. It's not replaying what happened. It's tracking what works, what doesn't work, and getting more confident over time about rules that actually prevent failures. It tunes your Claude experience based on the unique challenges you've faced - not generic training data, not someone else's patterns. Yours.
+This is what makes it different from a memory plugin. It's not replaying what happened. It's tracking what works, what doesn't work, and getting more confident over time about rules that actually prevent failures.
 
 ### How the data flows
 
@@ -112,7 +114,7 @@ This is what makes Metacog different from a memory plugin. It's not replaying wh
 1. Reads the active patterns marker from the previous session
 2. Runs all pattern detectors against the session state
 3. For each detector that fires: emits a **detection** (the failure happened)
-4. For each detector that *doesn't* fire but was in the active set: emits a **suppression** (the rule prevented the failure)
+4. For each detector that *doesn't* fire but was in the active set *and whose preconditions were met* (e.g., searches actually happened): emits a **suppression** (the rule prevented the failure). Sessions where the relevant scenario never arose are ignored — no free confidence.
 5. Persists both to the JSONL log - global and project-scoped
 
 **Compilation** - next session's digest merges detections and suppressions. Both increase total evidence. Suppressions get a confidence bonus. Only rules with zero activity for 60+ days decay. Pruning at 120 days for low-evidence rules.
@@ -128,9 +130,7 @@ At compilation time, both are merged. Project-scoped entries take precedence whe
 
 ---
 
-## Get started in one minute
-
-**Step 1: Install the hooks**
+## Get started
 
 ```bash
 npx @houtini/metacog --install
@@ -146,9 +146,7 @@ For per-project installation:
 npx @houtini/metacog --install --project
 ```
 
-**Step 2: Use Claude Code normally**
-
-That's it. Metacog runs silently. You'll only see output when something is abnormal.
+And that's it. Metacog runs silently. You'll only see output when something is abnormal.
 
 ### Manual installation
 
@@ -239,19 +237,67 @@ Metacog works with zero configuration. To tune thresholds, create `.claude/metac
 | `spatial.blast_radius_threshold` | 5 | File imports before signalling |
 | `vestibular.consecutive_similar` | 4 | Identical actions before signalling |
 
+### Pattern detector thresholds
+
+The cross-session learning detectors are also configurable. You can tune thresholds or disable individual detectors:
+
+```json
+{
+  "patterns": {
+    "circular_search": { "enabled": true, "consecutive_runs": 2 },
+    "repeated_file_read": { "enabled": true, "repeat_threshold": 3 },
+    "error_loop": { "enabled": true, "recent_window": 10, "min_errors": 4, "max_unique_sigs": 2 },
+    "long_autonomous_run": { "enabled": true, "turn_threshold": 50 },
+    "write_heavy_session": { "enabled": true, "min_writes": 10, "read_ratio": 0.5 }
+  }
+}
+```
+
+Set `"enabled": false` on any detector to exclude it entirely.
+
+### Custom pattern detectors
+
+You can define your own detectors in a JSON file and point to it in config:
+
+```json
+{
+  "custom_patterns_path": ".claude/my-patterns.json"
+}
+```
+
+Each custom detector uses a simple condition DSL:
+
+```json
+[
+  {
+    "id": "too_many_bash_calls",
+    "category": "Execution Patterns",
+    "lesson": "Consider using dedicated tools (Read, Grep) instead of Bash for file operations.",
+    "relevant_tools": ["Bash"],
+    "condition": {
+      "type": "count_exceeds",
+      "filter": { "tool_name": "Bash" },
+      "threshold": 15
+    }
+  }
+]
+```
+
+Supported condition types: `count_exceeds`, `consecutive_exceeds`, `ratio_exceeds`.
+
 ---
 
 ## The backstory
 
 This started with a question about metacognition - thinking about thinking. Could we make AI agents reflect on their own behaviour? But the deeper I got, the more I realised the real problem isn't that agents think badly. It's that they can't feel anything.
 
-I don't know much about human neurology, but the proprioception metaphor turned out to be the right one. You don't avoid walking into walls because a "Collision Detection Module" writes a report about a recent impact. You avoid walls because your nervous system provides immediate, low-latency, non-verbal feedback about your physical state and boundaries. That's the insight from the Extended Mind Thesis (Clark & Chalmers) - cognition doesn't just happen in the brain, it happens in the interaction between the system and its environment.
+I don't know much about human neurology, but the proprioception metaphor turned out to be the right one. You don't avoid walking into walls because a "Collision Detection Module" writes a report about a recent impact. You avoid walls because your nervous system provides immediate, low-latency, non-verbal feedback about your physical state and boundaries.
 
 But proprioception alone only works within a session. The agent wakes up fresh every time. So I built reinforcement tracking on top - a way for the agent to carry forward behavioural lessons across sessions, with a confidence model that actually rewards rules for working rather than punishing them for not failing.
 
-Most agent memory systems are either activity logs (what happened) or skill libraries (what to do). This is neither. It's a record of what goes wrong, what prevents it from going wrong, and how confident we should be in each lesson. It adapts to you.
+Most agent memory systems are either activity logs (what happened) or skill libraries (what to do). This is neither. It's a record of what goes wrong, what prevents it from going wrong, and how confident we should be in each lesson.
 
-See `SPEC.md` for the full design specification and theoretical foundation.
+See `SPEC.md` for the full design specification.
 
 ---
 

@@ -17,7 +17,7 @@
  * Zero dependencies. Pure Node.js.
  */
 
-import { readFileSync, writeFileSync, appendFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
@@ -32,104 +32,216 @@ const PRUNE_THRESHOLD_DAYS = 120;           // longer before pruning
 const MAX_DIGEST_ENTRIES = 25;
 
 /**
- * Known behavioral patterns and how to detect them from session state.
- * Each detector receives the full session state and returns a learning or null.
+ * Build the built-in pattern detectors using configurable thresholds.
+ * Detectors whose config sets enabled=false are excluded.
+ *
+ * @param {object} patternsConfig - config.patterns object (from config.js DEFAULTS)
+ * @returns {Array} array of detector objects
  */
-const PATTERN_DETECTORS = [
-  {
-    id: 'circular_search',
-    // Used by JIT routing: which tool types make this rule relevant
-    relevantTools: ['Read', 'Grep', 'Glob'],
-    detect(state) {
-      const actions = state.actions || [];
-      const searchRuns = countConsecutiveRuns(actions, 'read');
-      if (searchRuns >= 2) {
-        return {
-          pattern: 'circular_search',
-          category: 'Search Patterns',
-          lesson: 'When searching for a pattern, use one broad Grep before narrowing. Multiple sequential search calls on the same target signals thrashing.',
-        };
-      }
-      return null;
-    },
-  },
-  {
-    id: 'repeated_file_read',
-    relevantTools: ['Read'],
-    detect(state) {
-      const actions = state.actions || [];
-      const readTargets = actions
-        .filter(a => a.tool_name === 'Read')
-        .map(a => a.target_resource);
+export function buildPatternDetectors(patternsConfig = {}) {
+  const detectors = [];
+  const cs = { consecutive_runs: 2, ...patternsConfig.circular_search };
+  const rfr = { repeat_threshold: 3, ...patternsConfig.repeated_file_read };
+  const el = { recent_window: 10, min_errors: 4, max_unique_sigs: 2, ...patternsConfig.error_loop };
+  const lar = { turn_threshold: 50, ...patternsConfig.long_autonomous_run };
+  const whs = { min_writes: 10, read_ratio: 0.5, ...patternsConfig.write_heavy_session };
 
-      const counts = {};
-      for (const t of readTargets) {
-        counts[t] = (counts[t] || 0) + 1;
-      }
-
-      const repeats = Object.entries(counts).filter(([, c]) => c >= 3);
-      if (repeats.length > 0) {
-        return {
-          pattern: 'repeated_file_read',
-          category: 'File Access',
-          lesson: 'Files read 3+ times per session should be summarised to a scratchpad early. Context compaction deletes the content but not the need for it.',
-        };
-      }
-      return null;
-    },
-  },
-  {
-    id: 'error_loop',
-    relevantTools: ['Bash', 'Edit', 'Write'],
-    detect(state) {
-      const actions = state.actions || [];
-      const recentErrors = actions.slice(-10).filter(a => a.exit_status === 'error');
-      if (recentErrors.length >= 4) {
-        const sigs = recentErrors.map(a => a.error_signature).filter(Boolean);
-        const uniqueSigs = new Set(sigs);
-        if (uniqueSigs.size <= 2 && sigs.length >= 3) {
+  if (cs.enabled !== false) {
+    detectors.push({
+      id: 'circular_search',
+      relevantTools: ['Read', 'Grep', 'Glob'],
+      preconditionMet(state) {
+        return (state.actions || []).filter(a => a.action_type === 'read').length >= 2;
+      },
+      detect(state) {
+        const actions = state.actions || [];
+        if (countConsecutiveRuns(actions, 'read') >= cs.consecutive_runs) {
           return {
-            pattern: 'error_loop',
-            category: 'Error Handling',
-            lesson: 'When hitting the same error 3+ times, stop and diagnose the root cause rather than retrying. Check assumptions about paths, APIs, and environment.',
+            pattern: 'circular_search',
+            category: 'Search Patterns',
+            lesson: 'When searching for a pattern, use one broad Grep before narrowing. Multiple sequential search calls on the same target signals thrashing.',
           };
         }
+        return null;
+      },
+    });
+  }
+
+  if (rfr.enabled !== false) {
+    detectors.push({
+      id: 'repeated_file_read',
+      relevantTools: ['Read'],
+      preconditionMet(state) {
+        return (state.actions || []).filter(a => a.tool_name === 'Read').length >= rfr.repeat_threshold;
+      },
+      detect(state) {
+        const actions = state.actions || [];
+        const readTargets = actions.filter(a => a.tool_name === 'Read').map(a => a.target_resource);
+        const counts = {};
+        for (const t of readTargets) { counts[t] = (counts[t] || 0) + 1; }
+        const repeats = Object.entries(counts).filter(([, c]) => c >= rfr.repeat_threshold);
+        if (repeats.length > 0) {
+          return {
+            pattern: 'repeated_file_read',
+            category: 'File Access',
+            lesson: 'Files read 3+ times per session should be summarised to a scratchpad early. Context compaction deletes the content but not the need for it.',
+          };
+        }
+        return null;
+      },
+    });
+  }
+
+  if (el.enabled !== false) {
+    detectors.push({
+      id: 'error_loop',
+      relevantTools: ['Bash', 'Edit', 'Write'],
+      preconditionMet(state) {
+        return (state.actions || []).filter(a => a.exit_status === 'error').length >= 2;
+      },
+      detect(state) {
+        const actions = state.actions || [];
+        const recentErrors = actions.slice(-el.recent_window).filter(a => a.exit_status === 'error');
+        if (recentErrors.length >= el.min_errors) {
+          const sigs = recentErrors.map(a => a.error_signature).filter(Boolean);
+          const uniqueSigs = new Set(sigs);
+          if (uniqueSigs.size <= el.max_unique_sigs && sigs.length >= 3) {
+            return {
+              pattern: 'error_loop',
+              category: 'Error Handling',
+              lesson: 'When hitting the same error 3+ times, stop and diagnose the root cause rather than retrying. Check assumptions about paths, APIs, and environment.',
+            };
+          }
+        }
+        return null;
+      },
+    });
+  }
+
+  if (lar.enabled !== false) {
+    detectors.push({
+      id: 'long_autonomous_run',
+      relevantTools: [],
+      preconditionMet(state) {
+        return (state.turn_count || 0) >= Math.floor(lar.turn_threshold * 0.4);
+      },
+      detect(state) {
+        if (state.turn_count > lar.turn_threshold) {
+          return {
+            pattern: 'long_autonomous_run',
+            category: 'Autonomy',
+            lesson: `Sessions exceeding ${lar.turn_threshold} tool calls should delegate independent work to background agents earlier. Context pressure increases with every call.`,
+          };
+        }
+        return null;
+      },
+    });
+  }
+
+  if (whs.enabled !== false) {
+    detectors.push({
+      id: 'write_heavy_session',
+      relevantTools: ['Edit', 'Write'],
+      preconditionMet(state) {
+        return (state.actions || []).filter(a => a.action_type === 'write').length >= 5;
+      },
+      detect(state) {
+        const actions = state.actions || [];
+        const writes = actions.filter(a => a.action_type === 'write').length;
+        const reads = actions.filter(a => a.action_type === 'read').length;
+        if (writes > whs.min_writes && reads < writes * whs.read_ratio) {
+          return {
+            pattern: 'write_heavy_session',
+            category: 'Code Quality',
+            lesson: 'High write-to-read ratio suggests editing without sufficient context. Read before writing — especially files you haven\'t seen this session.',
+          };
+        }
+        return null;
+      },
+    });
+  }
+
+  return detectors;
+}
+
+/**
+ * Load user-defined pattern detectors from a JSON file.
+ *
+ * Each custom detector is a JSON object with:
+ *   id, category, lesson, relevant_tools[], condition: { type, filter?, threshold }
+ *
+ * Supported condition types:
+ *   - count_exceeds:       count actions matching filter > threshold
+ *   - consecutive_exceeds: consecutive matching actions > threshold
+ *   - ratio_exceeds:       ratio of matching to total actions > threshold
+ */
+export function loadCustomDetectors(customPath) {
+  if (!customPath) return [];
+  try {
+    const raw = readFileSync(customPath, 'utf-8');
+    const customs = JSON.parse(raw);
+    if (!Array.isArray(customs)) return [];
+    return customs.map(c => ({
+      id: c.id,
+      relevantTools: c.relevant_tools || [],
+      preconditionMet(state) {
+        if (!c.relevant_tools?.length) return true;
+        return (state.actions || []).some(a => c.relevant_tools.includes(a.tool_name));
+      },
+      detect(state) {
+        return evaluateCustomCondition(c.condition, state) ? {
+          pattern: c.id,
+          category: c.category || 'Custom',
+          lesson: c.lesson || 'Custom pattern detected.',
+        } : null;
+      },
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function evaluateCustomCondition(condition, state) {
+  if (!condition || !condition.type) return false;
+  const actions = state.actions || [];
+  const matching = filterActions(actions, condition.filter);
+
+  switch (condition.type) {
+    case 'count_exceeds':
+      return matching.length > (condition.threshold || 0);
+
+    case 'consecutive_exceeds': {
+      let max = 0, run = 0;
+      for (const a of actions) {
+        if (matchesFilter(a, condition.filter)) { run++; max = Math.max(max, run); }
+        else { run = 0; }
       }
-      return null;
-    },
-  },
-  {
-    id: 'long_autonomous_run',
-    relevantTools: [],  // always relevant — meta-pattern
-    detect(state) {
-      if (state.turn_count > 50) {
-        return {
-          pattern: 'long_autonomous_run',
-          category: 'Autonomy',
-          lesson: 'Sessions exceeding 50 tool calls should delegate independent work to background agents earlier. Context pressure increases with every call.',
-        };
-      }
-      return null;
-    },
-  },
-  {
-    id: 'write_heavy_session',
-    relevantTools: ['Edit', 'Write'],
-    detect(state) {
-      const actions = state.actions || [];
-      const writes = actions.filter(a => a.action_type === 'write').length;
-      const reads = actions.filter(a => a.action_type === 'read').length;
-      if (writes > 10 && reads < writes * 0.5) {
-        return {
-          pattern: 'write_heavy_session',
-          category: 'Code Quality',
-          lesson: 'High write-to-read ratio suggests editing without sufficient context. Read before writing — especially files you haven\'t seen this session.',
-        };
-      }
-      return null;
-    },
-  },
-];
+      return max > (condition.threshold || 0);
+    }
+
+    case 'ratio_exceeds':
+      return actions.length > 0 && (matching.length / actions.length) > (condition.threshold || 0);
+
+    default:
+      return false;
+  }
+}
+
+function filterActions(actions, filter) {
+  if (!filter) return actions;
+  return actions.filter(a => matchesFilter(a, filter));
+}
+
+function matchesFilter(action, filter) {
+  if (!filter) return true;
+  if (filter.tool_name && action.tool_name !== filter.tool_name) return false;
+  if (filter.action_type && action.action_type !== filter.action_type) return false;
+  if (filter.exit_status && action.exit_status !== filter.exit_status) return false;
+  return true;
+}
+
+// Default detectors built with default thresholds (backward compatible)
+const PATTERN_DETECTORS = buildPatternDetectors();
 
 /**
  * Analyse a completed session and extract behavioral learnings.
@@ -141,11 +253,11 @@ const PATTERN_DETECTORS = [
  *
  * Returns array of learning objects.
  */
-export function extractLearnings(state, activePatternIds = []) {
+export function extractLearnings(state, activePatternIds = [], detectors = null) {
   const learnings = [];
   const activeSet = new Set(activePatternIds);
 
-  for (const detector of PATTERN_DETECTORS) {
+  for (const detector of (detectors || PATTERN_DETECTORS)) {
     try {
       const result = detector.detect(state);
       if (result) {
@@ -158,13 +270,20 @@ export function extractLearnings(state, activePatternIds = []) {
         });
       } else if (activeSet.has(detector.id)) {
         // Pattern did NOT fire, but the rule was injected this session.
-        // The rule successfully suppressed the failure — reinforce it.
-        learnings.push({
-          pattern: detector.id,
-          type: 'suppression',
-          detected_at: new Date().toISOString(),
-          session_turn_count: state.turn_count || 0,
-        });
+        // Only count as suppression if the preconditions were met — i.e.,
+        // the situation arose but the failure didn't happen. This prevents
+        // inflating confidence when the relevant scenario never occurred.
+        const preconditionMet = detector.preconditionMet
+          ? detector.preconditionMet(state)
+          : true;  // no precondition = always count (backward compat)
+        if (preconditionMet) {
+          learnings.push({
+            pattern: detector.id,
+            type: 'suppression',
+            detected_at: new Date().toISOString(),
+            session_turn_count: state.turn_count || 0,
+          });
+        }
       }
     } catch {
       // Detector failure is non-fatal
@@ -423,6 +542,95 @@ function countConsecutiveRuns(actions, actionType) {
     }
   }
   return maxRun;
+}
+
+/**
+ * Extract a motor learning when a nociceptive event resolves.
+ *
+ * Scans the action window to find the failure cluster and the resolution
+ * action(s), then generates a heuristic lesson from the delta.
+ *
+ * Returns a learning object or null if extraction isn't possible.
+ */
+export function extractMotorLearning(state) {
+  const actions = state.actions || [];
+  if (actions.length < 3) return null;
+
+  // Find the boundary: walk backward from end to find where errors stopped
+  // The tail should be successes (resolution), preceded by errors (failure)
+  let resolutionStart = -1;
+  for (let i = actions.length - 1; i >= 0; i--) {
+    if (actions[i].exit_status === 'error') {
+      resolutionStart = i + 1;
+      break;
+    }
+  }
+
+  // No errors found in window — nothing to learn from
+  if (resolutionStart <= 0) return null;
+
+  // Find where the error cluster started
+  let failureStart = resolutionStart - 1;
+  for (let i = resolutionStart - 1; i >= 0; i--) {
+    if (actions[i].exit_status !== 'error') {
+      failureStart = i + 1;
+      break;
+    }
+    if (i === 0) failureStart = 0;
+  }
+
+  const failureActions = actions.slice(failureStart, resolutionStart);
+  const resolutionActions = actions.slice(resolutionStart);
+
+  if (failureActions.length < 2 || resolutionActions.length === 0) return null;
+
+  // Extract what changed between failure and resolution
+  const failureTools = new Set(failureActions.map(a => a.tool_name));
+  const resolutionTool = resolutionActions[0].tool_name;
+  const resolutionTarget = resolutionActions[0].target_resource || 'unknown';
+  const failureTarget = failureActions[0].target_resource || 'unknown';
+
+  // Compute the error signature from the cluster
+  const errorSigs = failureActions.map(a => a.error_signature).filter(Boolean);
+  const primarySig = errorSigs[0] || 'unknown error';
+
+  // Determine what kind of strategy shift resolved it
+  let resolutionSummary;
+  if (!failureTools.has(resolutionTool)) {
+    resolutionSummary = `switching from ${[...failureTools].join('/')} to ${resolutionTool}`;
+  } else if (resolutionTarget !== failureTarget) {
+    resolutionSummary = `changing target from ${basename(failureTarget)} to ${basename(resolutionTarget)}`;
+  } else {
+    resolutionSummary = `a different approach with ${resolutionTool}`;
+  }
+
+  // Generate a short hash-like ID from the error signature
+  const sigHash = primarySig.slice(0, 30).replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+
+  return {
+    pattern: `motor_${sigHash}`,
+    type: 'motor_learning',
+    category: 'Resolved Failures',
+    lesson: `After ${failureActions.length} failures (${primarySig.slice(0, 60)}), resolution came from ${resolutionSummary}. When hitting this error pattern, try changing tools or targets rather than retrying the same approach.`,
+    failure_window: {
+      start_turn: failureStart,
+      end_turn: resolutionStart - 1,
+      error_count: failureActions.length,
+    },
+    resolution_action: {
+      tool: resolutionTool,
+      target: resolutionTarget,
+    },
+    detected_at: new Date().toISOString(),
+    session_turn_count: state.turn_count || 0,
+    confidence: 0.6,
+    evidence: 1,
+  };
+}
+
+function basename(path) {
+  if (!path) return 'unknown';
+  return path.split(/[/\\]/).pop() || path;
 }
 
 export { LEARNINGS_PATH, DIGEST_PATH, CLAUDE_DIR, PATTERN_DETECTORS };

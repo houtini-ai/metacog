@@ -21,6 +21,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const HOOK_SCRIPT_PATH = resolve(join(__dirname, 'hook.js'));
+const DIGEST_SCRIPT_PATH = resolve(join(__dirname, 'digest-inject.js'));
 
 function main() {
   const args = process.argv.slice(2);
@@ -62,19 +63,18 @@ function installHook(settings, settingsPath) {
   // Ensure hooks structure exists
   if (!settings.hooks) settings.hooks = {};
   if (!settings.hooks.PostToolUse) settings.hooks.PostToolUse = [];
+  if (!settings.hooks.UserPromptSubmit) settings.hooks.UserPromptSubmit = [];
 
-  // Check if already installed
-  const existing = settings.hooks.PostToolUse.find(h =>
+  // --- PostToolUse hook (nervous system) ---
+  const existingPost = settings.hooks.PostToolUse.find(h =>
     h.hooks?.some(hook => hook.command?.includes('metacog'))
   );
 
-  if (existing) {
-    console.log('Metacog hook is already installed. Updating...');
-    // Update the command path
-    const hook = existing.hooks.find(h => h.command?.includes('metacog'));
+  if (existingPost) {
+    console.log('PostToolUse hook already installed. Updating...');
+    const hook = existingPost.hooks.find(h => h.command?.includes('metacog'));
     if (hook) hook.command = `node "${HOOK_SCRIPT_PATH}"`;
   } else {
-    // Add new hook entry
     settings.hooks.PostToolUse.push({
       matcher: '*',
       hooks: [
@@ -86,42 +86,70 @@ function installHook(settings, settingsPath) {
     });
   }
 
+  // --- UserPromptSubmit hook (digest injector) ---
+  const existingDigest = settings.hooks.UserPromptSubmit.find(h =>
+    h.hooks?.some(hook => hook.command?.includes('metacog'))
+  );
+
+  if (existingDigest) {
+    console.log('UserPromptSubmit hook already installed. Updating...');
+    const hook = existingDigest.hooks.find(h => h.command?.includes('metacog'));
+    if (hook) hook.command = `node "${DIGEST_SCRIPT_PATH}"`;
+  } else {
+    settings.hooks.UserPromptSubmit.push({
+      hooks: [
+        {
+          type: 'command',
+          command: `node "${DIGEST_SCRIPT_PATH}"`,
+        },
+      ],
+    });
+  }
+
   // Write settings
   mkdirSync(dirname(settingsPath), { recursive: true });
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
 
   console.log('');
-  console.log('Metacog PNS installed successfully.');
-  console.log(`Hook script: ${HOOK_SCRIPT_PATH}`);
+  console.log('Metacog installed successfully.');
+  console.log(`  PostToolUse:       ${HOOK_SCRIPT_PATH}`);
+  console.log(`  UserPromptSubmit:  ${DIGEST_SCRIPT_PATH}`);
   console.log('');
-  console.log('The hook will fire after every tool call. When your senses detect');
-  console.log('something abnormal, you will receive a [Proprioception] signal.');
-  console.log('When everything is fine, there is zero overhead - silence means health.');
+  console.log('Two hooks are now active:');
+  console.log('  1. Nervous system — fires after every tool call (silent when normal)');
+  console.log('  2. Digest injector — fires once per session (injects learned rules)');
   console.log('');
   console.log('To customise thresholds, create .claude/metacog.config.json in your project.');
-  console.log('To remove: node install.js --remove');
+  console.log('To remove: npx @houtini/metacog --remove');
 }
 
 function removeHook(settings, settingsPath) {
-  if (!settings.hooks?.PostToolUse) {
-    console.log('No Metacog hook found. Nothing to remove.');
-    return;
+  let removed = false;
+
+  for (const hookType of ['PostToolUse', 'UserPromptSubmit']) {
+    if (!settings.hooks?.[hookType]) continue;
+
+    const before = settings.hooks[hookType].length;
+    settings.hooks[hookType] = settings.hooks[hookType].filter(h =>
+      !h.hooks?.some(hook => hook.command?.includes('metacog'))
+    );
+    if (settings.hooks[hookType].length < before) removed = true;
+
+    if (settings.hooks[hookType].length === 0) {
+      delete settings.hooks[hookType];
+    }
   }
 
-  settings.hooks.PostToolUse = settings.hooks.PostToolUse.filter(h =>
-    !h.hooks?.some(hook => hook.command?.includes('metacog'))
-  );
-
-  // Clean up empty arrays
-  if (settings.hooks.PostToolUse.length === 0) {
-    delete settings.hooks.PostToolUse;
-  }
-  if (Object.keys(settings.hooks).length === 0) {
+  if (settings.hooks && Object.keys(settings.hooks).length === 0) {
     delete settings.hooks;
   }
 
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
-  console.log('Metacog PNS hook removed.');
+  if (removed) {
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+    console.log('Metacog hooks removed.');
+  } else {
+    console.log('No Metacog hooks found. Nothing to remove.');
+  }
 }
 
 main();
