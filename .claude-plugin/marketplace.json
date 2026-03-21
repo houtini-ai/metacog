@@ -1,0 +1,28 @@
+{
+  "name": "houtini-ai",
+  "owner": {
+    "name": "Houtini AI",
+    "email": "npm@richardbaxter.co"
+  },
+  "metadata": {
+    "description": "AI agent tooling by Houtini AI",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "metacog",
+      "source": ".",
+      "description": "Proprioceptive nervous system for AI coding agents — gives Claude sensory awareness of its operational state",
+      "version": "0.3.0",
+      "author": {
+        "name": "Houtini AI",
+        "email": "npm@richardbaxter.co"
+      },
+      "homepage": "https://github.com/houtini-ai/metacog#readme",
+      "repository": "https://github.com/houtini-ai/metacog",
+      "license": "Apache-2.0",
+      "keywords": ["metacognition", "proprioception", "hooks", "reinforcement-learning", "agent-safety"],
+      "hooks": "./hooks/hooks.json"
+    }
+  ]
+}

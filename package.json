@@ -1,29 +1,26 @@
 {
   "name": "@houtini/metacog",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Proprioceptive Nervous System for AI Agents - gives coding agents sensory awareness of their operational state",
   "type": "module",
   "main": "src/hook.js",
-  "bin": {
-    "metacog": "src/install.js"
-  },
   "files": [
     "src/",
+    "hooks/",
+    ".claude-plugin/",
+    "assets/",
     "README.md",
     "SPEC.md",
     "LICENSE"
   ],
   "scripts": {
-    "install-hook": "node src/install.js",
     "test": "node --test src/__tests__/*.test.js"
   },
   "keywords": [
-    "mcp",
-    "mcp-server",
-    "model-context-protocol",
+    "claude-code-plugin",
+    "claude-code-hooks",
     "claude",
     "claude-code",
-    "claude-code-hooks",
     "metacognition",
     "proprioception",
     "ai-agent",

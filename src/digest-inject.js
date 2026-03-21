@@ -10,9 +10,9 @@
  *
  * On subsequent messages: exits silently (exit 0).
  *
- * Exit codes:
- *   0 = no output (subsequent messages, or no learnings)
- *   2 = digest injected via stderr
+ * Output:
+ *   exit 0, no stdout = no output (subsequent messages, or no learnings)
+ *   exit 0, stdout JSON = digest injected via systemMessage
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
@@ -76,9 +76,14 @@ async function main() {
     // Read the compiled digest
     const digest = readFileSync(DIGEST_PATH, 'utf-8');
 
-    // Inject as system-reminder
-    process.stderr.write(`[Metacog Behavioral Digest]\n${digest}`);
-    process.exit(2);
+    // Inject as system message via stdout JSON
+    const output = JSON.stringify({
+      continue: true,
+      suppressOutput: false,
+      systemMessage: `[Metacog Behavioral Digest]\n${digest}`
+    });
+    process.stdout.write(output);
+    process.exit(0);
 
   } catch (err) {
     // Graceful degradation — never break the agent

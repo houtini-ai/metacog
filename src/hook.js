@@ -6,9 +6,9 @@
  * The autonomic nervous system. Fires silently after every tool call.
  * Calculates proprioceptive signals, injects them ONLY when abnormal.
  *
- * Exit codes:
- *   0 = all senses normal, no output (zero token cost)
- *   2 = signal detected, stderr contains message for Claude
+ * Output:
+ *   exit 0, no stdout = all senses normal (zero token cost)
+ *   exit 0, stdout JSON = signal detected, systemMessage for Claude
  *
  * Design principles:
  *   - No news is good news (silent when normal)
@@ -104,18 +104,26 @@ async function main() {
       writeState(statePath, state);
 
       // Layer 2 interrupt - includes Layer 1 signals as context
-      const output = formatLayer2(nociResult.layer2, signals);
-      process.stderr.write(output);
-      process.exit(2);
+      const message = formatLayer2(nociResult.layer2, signals);
+      process.stdout.write(JSON.stringify({
+        continue: true,
+        suppressOutput: false,
+        systemMessage: message
+      }));
+      process.exit(0);
     }
 
     // Layer 1: Proprioceptive signals (if any)
     if (signals.length > 0) {
       writeState(statePath, state);
 
-      const output = formatLayer1(signals);
-      process.stderr.write(output);
-      process.exit(2);
+      const message = formatLayer1(signals);
+      process.stdout.write(JSON.stringify({
+        continue: true,
+        suppressOutput: false,
+        systemMessage: message
+      }));
+      process.exit(0);
     }
 
     // All clear - save state and exit silently

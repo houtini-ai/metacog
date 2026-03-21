@@ -1,0 +1,26 @@
+{
+  "description": "Metacog proprioceptive nervous system — silent monitoring with 5 senses and cross-session learning",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/hook.js\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/src/digest-inject.js\""
+          }
+        ]
+      }
+    ]
+  }
+}
