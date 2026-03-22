@@ -4,7 +4,11 @@
   "description": "Real-time metacognition for Claude Code. Six senses detect stuck loops, validation bias, repeated errors, and circular actions. Learns what works across sessions.",
   "type": "module",
   "main": "src/hook.js",
+  "bin": {
+    "metacog": "src/install.js"
+  },
   "files": [
+    "src/install.js",
     "src/",
     "hooks/",
     ".claude-plugin/",

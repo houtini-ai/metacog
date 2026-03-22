@@ -13,26 +13,28 @@
 
 ## Install
 
+### From npm
+
 ```bash
 npx @houtini/metacog --install
 ```
 
-That's it. The installer registers both hooks into your Claude Code settings. Metacog runs silently in the background from that point on - you'll only see output when something is abnormal.
+This downloads the package and registers both hooks into your global Claude Code settings (`~/.claude/settings.json`). Metacog runs silently in the background from that point on — you'll only see output when something is abnormal.
 
-### Project-scoped install
+For project-scoped install (writes to `.claude/settings.json` in the current directory):
 
 ```bash
 npx @houtini/metacog --install --project
 ```
 
-Installs into `.claude/settings.json` in the current project instead of globally.
-
-### Development install
+### From source
 
 ```bash
 git clone https://github.com/houtini-ai/metacog
-cd metacog && npx @houtini/metacog --install
+cd metacog && node src/install.js --install
 ```
+
+This points the hooks at your local clone, so changes take effect immediately.
 
 ---
 

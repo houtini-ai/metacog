@@ -1,7 +1,7 @@
 {
   "name": "metacog",
-  "version": "0.3.0",
-  "description": "Catches stuck loops, context overload, and repeated errors before your agent spirals. Learns what works across sessions instead of dumping memory logs the agent ignores.",
+  "version": "0.4.0",
+  "description": "Real-time metacognition for Claude Code. Six senses detect stuck loops, validation bias, repeated errors, and circular actions. Learns what works across sessions.",
   "author": {
     "name": "Houtini AI",
     "email": "npm@richardbaxter.co",

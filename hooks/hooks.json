@@ -1,5 +1,5 @@
 {
-  "description": "Metacog proprioceptive nervous system — silent monitoring with 5 senses and cross-session learning",
+  "description": "Metacog — real-time metacognition with 6 senses and cross-session learning",
   "hooks": {
     "PostToolUse": [
       {
