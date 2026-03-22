@@ -25,6 +25,7 @@ import { evaluate as evaluateChronos } from './senses/chronos.js';
 import { evaluate as evaluateNociception, checkResolution } from './senses/nociception.js';
 import { evaluate as evaluateSpatial } from './senses/spatial.js';
 import { evaluate as evaluateVestibular } from './senses/vestibular.js';
+import { evaluate as evaluateEcho } from './senses/echo.js';
 import { join } from 'path';
 
 async function main() {
@@ -77,6 +78,10 @@ async function main() {
     // 5. Vestibular - Action Diversity
     const vestibularSignal = evaluateVestibular(state, action, config.proprioception);
     if (vestibularSignal) signals.push({ sense: 'Vestibular', message: vestibularSignal });
+
+    // 6. Echo - Validation Bias
+    const echoSignal = evaluateEcho(state, action, config.proprioception);
+    if (echoSignal) signals.push({ sense: 'Echo', message: echoSignal });
 
     // --- Check for nociceptive resolution (Layer 3: Motor Learning) ---
     if (checkResolution(state)) {
@@ -141,7 +146,7 @@ async function main() {
 // --- Formatting ---
 
 function formatLayer1(signals) {
-  const lines = ['[Proprioception]'];
+  const lines = ['[Metacognition — review and ignore if not relevant]'];
   for (const s of signals) {
     lines.push(`${s.message}`);
   }

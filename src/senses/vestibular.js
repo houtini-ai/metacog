@@ -8,6 +8,8 @@
  * movements feel purposeful, but the trajectory is circular.
  */
 
+const DEFAULT_COOLDOWN = 6;
+
 /**
  * @param {object} state - Current session state
  * @param {object} action - The action that just occurred
@@ -16,6 +18,9 @@
  */
 export function evaluate(state, action, config) {
   const { vestibular } = config;
+
+  // Respect cooldown - one nudge is enough
+  if ((state.vestibular_cooldown || 0) > 0) return null;
 
   const recent = state.actions.slice(-(vestibular.consecutive_similar + 1));
   if (recent.length < vestibular.consecutive_similar) return null;
@@ -29,7 +34,8 @@ export function evaluate(state, action, config) {
 
   if (allSimilar && action.exit_status !== 'error') {
     // Don't fire if errors are happening - nociception handles that
-    return `You have performed ${vestibular.consecutive_similar} consecutive similar ${action.tool_name} actions. You may be searching in circles.`;
+    state.vestibular_cooldown = vestibular.cooldown || DEFAULT_COOLDOWN;
+    return `${vestibular.consecutive_similar} consecutive similar ${action.tool_name} actions detected. Are you making progress, or retracing the same ground?`;
   }
 
   // Check 2: Re-reading files already read earlier in the session
@@ -40,7 +46,8 @@ export function evaluate(state, action, config) {
     );
 
     if (earlierReads.length >= 2) {
-      return `You have read ${basename(action.target_resource)} ${earlierReads.length + 1} times this session. If previous reads were lost to compaction, summarise findings to a file before re-reading.`;
+      state.vestibular_cooldown = vestibular.cooldown || DEFAULT_COOLDOWN;
+      return `${basename(action.target_resource)} has been read ${earlierReads.length + 1} times this session. If earlier reads were lost to context compression, consider noting key findings in a task or memory before continuing.`;
     }
   }
 

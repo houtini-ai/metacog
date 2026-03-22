@@ -7,7 +7,7 @@
   <img src="assets/icon.png" alt="metacog" width="128">
 </p>
 
-Metacog takes a different approach to a memory mcp - instead of replaying the past, it gives your Claude Code agent real-time awareness of its own state. Five senses detect context overflow, stuck loops, repeated errors, and circular actions before they spiral. And when problems resolve, the system learns what fixed them - building rules that get stronger over time, not stale. Zero dependencies. One-command install. Open source.
+**Memory remembers what happened. Metacog notices how you're thinking.** Memory plugins serve a real purpose — they persist context, preferences, and project knowledge across sessions. Metacog does something different: it gives your Claude Code agent real-time awareness of its own cognitive state. Six senses detect context overflow, stuck loops, validation bias, repeated errors, and circular actions before they spiral. And when problems resolve, the system learns what fixed them — building rules that get stronger over time, not stale. Zero dependencies. One-command install. Open source.
 
 ---
 
@@ -69,29 +69,30 @@ Metacog uses two hooks: `PostToolUse` for the nervous system and `UserPromptSubm
 
 Metacog runs as a pair of Claude Code hooks. One fires after every tool call (the nervous system), the other fires once per session (the reinforcement injector). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short signal appears in the agent's context. Not a command - just awareness. The agent's own reasoning decides what to do about it.
 
-### The five senses
+### The six senses
 
 | Sense | Signal | What it detects |
 |-------|--------|-----------------|
-| **O2** | Context trend | Token velocity spikes - the agent is consuming context unsustainably |
+| **O2** | Context trend | Token velocity spikes — the agent is consuming context unsustainably |
 | **Chronos** | Temporal awareness | Time and step count since last user interaction |
-| **Nociception** | Error friction | Repeated similar errors - the agent is stuck |
+| **Nociception** | Error friction | Repeated similar errors — the agent is stuck |
 | **Spatial** | Blast radius | File dependency count after writes |
-| **Vestibular** | Action diversity | Repeated identical actions - going in circles |
+| **Vestibular** | Action diversity | Repeated identical actions — going in circles |
+| **Echo** | Validation bias | Writing code without running tests, or validating against own output instead of the project's test suite |
 
 ### The three layers
 
 <div align="center">
-  <img src="docs/five-senses.png" alt="Five Proprioceptive Senses" width="700">
+  <img src="docs/five-senses.png" alt="Proprioceptive Senses" width="700">
 </div>
 
 **Layer 1: Proprioception** (always on, near-zero cost)
 Calculates all five senses after every tool call. Injects a signal only when values deviate from baseline. Most turns: completely silent.
 
 ```
-[Proprioception]
-Context filling rapidly - 3 large file reads in last 5 actions.
-Consider summarising findings before proceeding.
+[Metacognition — review and ignore if not relevant]
+Context velocity is high (3 large file reads in last 5 actions).
+Does your current approach need all this context, or could an Agent subagent handle the remaining exploration?
 ```
 
 **Layer 2: Nociception** (triggered by Layer 1 thresholds)
@@ -111,17 +112,17 @@ When a nociceptive event resolves, the system extracts what changed. The delta b
 
 ---
 
-## Why not memory?
+## Memory vs. metacognition
 
-Everyone's building memory plugins - activity logs, vector databases, episodic recall. They all do roughly the same thing: capture what the agent did, compress it, store it, dump it back into context next session.
+Memory plugins are valuable — they persist what the agent knows across sessions: user preferences, project context, decisions made. Claude Code's built-in memory system does this well.
 
-The problem is fundamental. They treat the agent's context like a filing cabinet. The agent drowns in the report and walks into the same trap anyway.
+But memory answers "what happened?" Metacog answers "how am I thinking right now?" It's the difference between a journal and a nervous system. One records the past. The other tells you when your hand is on the stove.
 
 <div align="center">
-  <img src="docs/memory-trap.png" alt="The Memory Plugin Trap" width="700">
+  <img src="docs/memory-trap.png" alt="Memory and Metacognition" width="700">
 </div>
 
-Metacog doesn't replay what happened. It tracks what works, what doesn't, and gets more confident over time about rules that actually prevent failures.
+Metacog doesn't replace memory. It complements it by tracking *how the agent reasons* — what patterns lead to failure, what changes fix them — and building rules that get more confident over time.
 
 ### The seesaw problem
 
@@ -190,6 +191,10 @@ Metacog works with zero configuration. To tune thresholds, create `.claude/metac
     "vestibular": {
       "action_similarity": 0.8,
       "consecutive_similar": 4
+    },
+    "echo": {
+      "write_streak_threshold": 5,
+      "cooldown": 8
     }
   },
   "nociception": {
@@ -207,6 +212,7 @@ Metacog works with zero configuration. To tune thresholds, create `.claude/metac
 | `nociception.consecutive_errors` | 3 | Similar errors before signalling |
 | `spatial.blast_radius_threshold` | 5 | File imports before signalling |
 | `vestibular.consecutive_similar` | 4 | Identical actions before signalling |
+| `echo.write_streak_threshold` | 5 | Consecutive writes without test run before signalling |
 
 ### Pattern detectors
 
@@ -275,7 +281,8 @@ metacog/
 │       ├── chronos.js        # Temporal awareness
 │       ├── nociception.js    # Error friction + escalation
 │       ├── spatial.js        # Blast radius
-│       └── vestibular.js     # Action diversity
+│       ├── vestibular.js     # Action diversity
+│       └── echo.js           # Validation bias
 ├── assets/
 │   └── icon.png              # Plugin icon
 └── docs/                     # Diagrams
@@ -287,7 +294,7 @@ metacog/
 
 - **No news is good news** - signals only appear when values deviate from baseline
 - **Trends over absolutes** - measures velocity, not absolute values
-- **Inform, don't command** - provides awareness, trusts the agent's reasoning
+- **Invite reflection, don't command** - signals are observations the agent can act on or dismiss
 - **Graceful degradation** - if the hooks fail, the agent is just normal Claude
 - **Reinforcement over decay** - rules that work get stronger, not stale
 

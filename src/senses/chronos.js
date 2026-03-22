@@ -48,7 +48,7 @@ export function evaluate(state, action, config) {
   if (timeLevel >= 1) parts.push(`T+${timeStr}`);
   parts.push(`${steps} tool calls on current task`);
 
-  return `${parts.join(', ')}. Consider whether to continue independently or check in with the user.`;
+  return `${parts.join(', ')}. Is this still on track, or would a user check-in help?`;
 }
 
 function formatDuration(ms) {

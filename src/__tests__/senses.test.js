@@ -8,6 +8,7 @@ import { evaluate as evaluateO2 } from '../senses/o2.js';
 import { evaluate as evaluateNociception } from '../senses/nociception.js';
 import { evaluate as evaluateChronos } from '../senses/chronos.js';
 import { evaluate as evaluateVestibular } from '../senses/vestibular.js';
+import { evaluate as evaluateEcho } from '../senses/echo.js';
 
 const config = DEFAULTS.proprioception;
 
@@ -76,7 +77,7 @@ describe('O2 - Context Trend', () => {
     const action = makeAction({ token_estimate: 7000 });
     const signal = evaluateO2(state, action, config);
     assert.ok(signal, 'Should produce a signal');
-    assert.ok(signal.includes('Context filling rapidly'), `Signal should mention context: ${signal}`);
+    assert.ok(signal.includes('Context velocity is high'), `Signal should mention context: ${signal}`);
   });
 });
 
@@ -179,6 +180,77 @@ describe('Vestibular - Action Diversity', () => {
     const action = makeAction({ tool_name: 'Grep', target_resource: 'findThisThing' });
     const result = evaluateVestibular(state, action, config);
     assert.ok(result, 'Should detect circular action pattern');
+  });
+});
+
+// --- Echo Tests ---
+describe('Echo - Validation Bias', () => {
+  it('should return null when few writes', () => {
+    const actions = [
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/a.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/b.ts' }),
+    ];
+    const state = buildState(actions);
+    const action = makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/c.ts' });
+    assert.equal(evaluateEcho(state, action, config), null);
+  });
+
+  it('should signal on write streak without tests', () => {
+    const actions = [
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/a.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/b.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/c.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/d.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/e.ts' }),
+    ];
+    const state = buildState(actions);
+    const action = makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/f.ts' });
+    const result = evaluateEcho(state, action, config);
+    assert.ok(result, 'Should signal on write streak');
+    assert.ok(result.includes('without running tests'), `Should mention tests: ${result}`);
+  });
+
+  it('should NOT signal when test run breaks the streak', () => {
+    const actions = [
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/a.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/b.ts' }),
+      makeAction({ action_type: 'execute', tool_name: 'Bash', target_resource: 'npm test' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/c.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/d.ts' }),
+    ];
+    const state = buildState(actions);
+    const action = makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/e.ts' });
+    assert.equal(evaluateEcho(state, action, config), null);
+  });
+
+  it('should detect self-test pattern', () => {
+    const actions = [
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/utils.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/__tests__/utils.test.ts' }),
+      makeAction({ action_type: 'read', tool_name: 'Read', target_resource: '/src/utils.ts' }),
+    ];
+    const state = buildState(actions);
+    const action = makeAction({
+      action_type: 'execute', tool_name: 'Bash',
+      target_resource: 'jest src/__tests__/utils.test.ts',
+      exit_status: 'success',
+    });
+    const result = evaluateEcho(state, action, config);
+    assert.ok(result, 'Should detect self-test pattern');
+    assert.ok(result.includes('full test suite'), `Should recommend full suite: ${result}`);
+  });
+
+  it('should respect cooldown', () => {
+    const actions = [
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/a.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/b.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/c.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/d.ts' }),
+      makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/e.ts' }),
+    ];
+    const state = buildState(actions, { echo_cooldown: 5 });
+    const action = makeAction({ action_type: 'write', tool_name: 'Edit', target_resource: '/src/f.ts' });
+    assert.equal(evaluateEcho(state, action, config), null, 'Should be silent during cooldown');
   });
 });
 

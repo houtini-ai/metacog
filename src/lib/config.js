@@ -31,6 +31,10 @@ const DEFAULTS = {
       action_similarity: 0.8,      // threshold for "same action"
       consecutive_similar: 4,      // consecutive similar actions before signal
     },
+    echo: {
+      write_streak_threshold: 5,   // consecutive writes without test run before signal
+      cooldown: 8,                 // turns of silence after firing
+    },
   },
   nociception: {
     escalation_cooldown: 5,        // turns of silence after intervention

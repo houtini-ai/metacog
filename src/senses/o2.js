@@ -6,7 +6,12 @@
  *
  * We measure token VELOCITY, not absolute usage, because we can't know
  * the actual context window size. A velocity spike is honest and measurable.
+ *
+ * Fires once then goes silent for a cooldown period. Repeating the same
+ * advice every tool call is noise, not awareness.
  */
+
+const DEFAULT_COOLDOWN = 8;
 
 /**
  * @param {object} state - Current session state
@@ -20,6 +25,9 @@ export function evaluate(state, action, config) {
   // Can't evaluate until baseline is established
   if (!state.baseline.established) return null;
 
+  // Respect cooldown - don't repeat ourselves
+  if ((state.o2_cooldown || 0) > 0) return null;
+
   const baseline = state.baseline.avg_token_velocity;
   if (baseline <= 0) return null;
 
@@ -31,6 +39,9 @@ export function evaluate(state, action, config) {
   const velocityRatio = recentAvg / baseline;
 
   if (velocityRatio >= o2.velocity_multiplier) {
+    // Set cooldown so we don't fire again for N turns
+    state.o2_cooldown = o2.cooldown || DEFAULT_COOLDOWN;
+
     // Count large reads specifically
     const largeReads = recent.filter(
       a => a.action_type === 'read' && a.token_estimate > baseline * 2
@@ -40,7 +51,7 @@ export function evaluate(state, action, config) {
       ? `${largeReads} large file read${largeReads > 1 ? 's' : ''} in last ${recent.length} actions`
       : `token consumption at ${velocityRatio.toFixed(1)}x baseline rate`;
 
-    return `Context filling rapidly (${detail}). Consider summarising findings to a scratchpad before proceeding with more reads.`;
+    return `Context velocity is high (${detail}). Does your current approach need all this context, or could an Agent subagent handle the remaining exploration?`;
   }
 
   return null;

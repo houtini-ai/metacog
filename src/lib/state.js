@@ -169,9 +169,18 @@ export function appendAction(state, action, sessionId, projectScope, config = nu
     }
   }
 
-  // Tick cooldown
+  // Tick cooldowns
   if (state.nociception.cooldown_remaining > 0) {
     state.nociception.cooldown_remaining--;
+  }
+  if ((state.o2_cooldown || 0) > 0) {
+    state.o2_cooldown--;
+  }
+  if ((state.vestibular_cooldown || 0) > 0) {
+    state.vestibular_cooldown--;
+  }
+  if ((state.echo_cooldown || 0) > 0) {
+    state.echo_cooldown--;
   }
 
   return state;
