@@ -7,7 +7,17 @@
   <img src="assets/icon.png" alt="metacog" width="128">
 </p>
 
-**Memory remembers what happened. Metacog notices how you're thinking.** Memory plugins serve a real purpose — they persist context, preferences, and project knowledge across sessions. Metacog does something different: it gives your Claude Code agent real-time awareness of its own cognitive state. Seven senses detect context overflow, stuck loops, scope drift, validation bias, repeated errors, and circular actions before they spiral. Session retrospectives and user interaction tracking help both agent and human collaborate more effectively. And when problems resolve, the system learns what fixed them — building rules that get stronger over time, not stale. Zero dependencies. One-command install. Open source.
+So, here's the problem with AI coding agents: they can't feel when they're stuck. They'll retry the same broken fix five times because they can see each individual error but not the *pattern* of repeated failure. They'll read the same file three times in a session because context compaction wiped their memory of reading it. They'll chase a dependency chain four levels deep and forget what they were originally trying to fix. They have no sense of time, no peripheral vision of how their changes affect other files, and no awareness of whether they're actually validating their work or just admiring it.
+
+Metacog is a pair of Claude Code hooks that gives the agent a nervous system. One hook fires after every tool call and watches for these patterns. The other fires when you send a message and injects learned rules from past sessions. When everything is fine, both hooks are completely silent, zero tokens, zero cost. When something is off, a short signal appears in the agent's context. Not a command, just awareness. The agent's own reasoning decides what to do about it.
+
+And when problems do resolve, the system extracts what changed and persists it as a behavioural rule that gets injected into future sessions. The clever bit is that rules get *stronger* when they work, not stale. If the agent stops making a mistake because the rule prevented it, that counts as evidence the rule is good. Most memory systems would see that silence and prune the rule. Metacog reinforces it.
+
+Seven senses. Session retrospectives. User interaction tracking. Zero dependencies. One-command install. Open source.
+
+> **Quick Navigation**
+>
+> [Install](#install) | [What are hooks?](#what-are-claude-code-hooks) | [What it does](#what-it-does) | [The seven senses](#the-seven-senses) | [The three layers](#the-three-layers) | [Memory vs. metacognition](#memory-vs-metacognition) | [Session retrospectives](#session-retrospectives) | [User interaction tracking](#user-interaction-tracking) | [How the data flows](#how-the-data-flows) | [Configuration](#configuration) | [Plugin structure](#plugin-structure) | [Design principles](#design-principles)
 
 ---
 
@@ -19,7 +29,7 @@
 npx @houtini/metacog --install
 ```
 
-This downloads the package and registers both hooks into your global Claude Code settings (`~/.claude/settings.json`). Metacog runs silently in the background from that point on — you'll only see output when something is abnormal.
+This downloads the package and registers both hooks into your global Claude Code settings (`~/.claude/settings.json`). Metacog runs silently in the background from that point on. You'll only see output when something is abnormal.
 
 For project-scoped install (writes to `.claude/settings.json` in the current directory):
 
@@ -75,13 +85,13 @@ Metacog runs as a pair of Claude Code hooks. One fires after every tool call (th
 
 | Sense | Signal | What it detects |
 |-------|--------|-----------------|
-| **O2** | Context trend | Token velocity spikes — the agent is consuming context unsustainably |
+| **O2** | Context trend | Token velocity spikes, the agent is consuming context unsustainably |
 | **Chronos** | Temporal awareness | Time and step count since last user interaction |
-| **Nociception** | Error friction | Repeated similar errors — the agent is stuck |
+| **Nociception** | Error friction | Repeated similar errors, the agent is stuck |
 | **Spatial** | Blast radius | File dependency count after writes |
-| **Vestibular** | Action diversity | Repeated identical actions — going in circles |
+| **Vestibular** | Action diversity | Repeated identical actions, going in circles |
 | **Echo** | Validation bias | Writing code without running tests, or validating against own output instead of the project's test suite |
-| **Drift** | Scope drift | Recent actions have diverged from the original task — chasing dependency chains instead of solving the problem |
+| **Drift** | Scope drift | Recent actions have diverged from the original task, chasing dependency chains instead of solving the problem |
 
 ### The three layers
 
@@ -117,7 +127,7 @@ When a nociceptive event resolves, the system extracts what changed. The delta b
 
 ## Memory vs. metacognition
 
-Memory plugins are valuable — they persist what the agent knows across sessions: user preferences, project context, decisions made. Claude Code's built-in memory system does this well.
+Memory plugins do a real job. They persist what the agent knows across sessions: user preferences, project context, decisions made. Claude Code's built-in memory system does this well.
 
 But memory answers "what happened?" Metacog answers "how am I thinking right now?" It's the difference between a journal and a nervous system. One records the past. The other tells you when your hand is on the stove.
 
@@ -125,7 +135,7 @@ But memory answers "what happened?" Metacog answers "how am I thinking right now
   <img src="docs/memory-trap.png" alt="Memory and Metacognition" width="700">
 </div>
 
-Metacog doesn't replace memory. It complements it by tracking *how the agent reasons* — what patterns lead to failure, what changes fix them — and building rules that get more confident over time.
+Metacog doesn't replace memory. It complements it by tracking *how the agent reasons*, what patterns lead to failure, what changes fix them, and building rules that get more confident over time.
 
 ### The seesaw problem
 
@@ -143,7 +153,7 @@ Metacog inverts this. When a known pattern *doesn't* fire during a session where
 
 ### Subagent awareness
 
-When the agent delegates work to a subagent, the subagent's tool calls can inflate turn counts and token velocity — triggering false positives from Chronos and O2. Metacog detects Agent tool calls and suppresses these senses during delegation, so productive delegation isn't penalised.
+When the agent delegates work to a subagent, the subagent's tool calls can inflate turn counts and token velocity, triggering false positives from Chronos and O2. Metacog detects Agent tool calls and suppresses these senses during delegation, so productive delegation isn't penalised.
 
 ### Session retrospectives
 
@@ -155,12 +165,12 @@ Last session: 57 tool calls over 9 min.
 Senses that fired: O2 (context velocity), Chronos (level 2).
 1 subagent delegation used.
 Action mix: 14 reads, 0 writes, 5 executes
-2 user messages, avg 28 tool calls between messages — prompts were mostly broad/exploratory
+2 user messages, avg 28 tool calls between messages, prompts were mostly broad/exploratory
 ```
 
 ### User interaction tracking
 
-The `UserPromptSubmit` hook analyses each user message for specificity (file paths, line numbers, identifiers, error text) and tracks interaction patterns across the session. When patterns emerge — like vague prompts consistently leading to long autonomous runs — the system surfaces collaborative insights for both agent and user.
+The `UserPromptSubmit` hook analyses each user message for specificity (file paths, line numbers, identifiers, error text) and tracks interaction patterns across the session. When patterns emerge, like vague prompts consistently leading to long autonomous runs, the system surfaces collaborative insights for both agent and user.
 
 ```
 [Metacog — Collaboration Patterns]
