@@ -154,17 +154,25 @@ function buildInteractionInsight(state) {
 
   const insights = [];
 
-  if (avgSpecificity < 0.3 && avgToolsPerPrompt > 20) {
-    insights.push(
-      'Sessions with broader prompts tend to run longer in this project. ' +
-      'Mentioning specific files, functions, or line numbers helps the agent converge faster.'
-    );
+  // Calculate avg tools for specific vs broad prompts separately
+  const specific = recent.filter(i => (i.specificity || 0) >= 0.4 && i.tools_before_next != null);
+  const broad = recent.filter(i => (i.specificity || 0) < 0.4 && i.tools_before_next != null);
+
+  if (specific.length >= 2 && broad.length >= 2) {
+    const avgSpecific = Math.round(specific.reduce((s, i) => s + i.tools_before_next, 0) / specific.length);
+    const avgBroad = Math.round(broad.reduce((s, i) => s + i.tools_before_next, 0) / broad.length);
+
+    if (avgBroad > avgSpecific * 1.5 && avgBroad > 15) {
+      insights.push(
+        `Prompts mentioning specific files/functions averaged ${avgSpecific} tool calls. ` +
+        `Broader prompts averaged ${avgBroad}. Data from last ${recent.length} interactions in this project.`
+      );
+    }
   }
 
   if (avgToolsPerPrompt > 40) {
     insights.push(
-      'Recent prompts averaged ' + Math.round(avgToolsPerPrompt) + ' tool calls each. ' +
-      'Consider breaking complex tasks into smaller prompts or adding mid-task check-ins.'
+      'Recent prompts averaged ' + Math.round(avgToolsPerPrompt) + ' tool calls each in this project.'
     );
   }
 

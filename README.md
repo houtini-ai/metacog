@@ -9,9 +9,9 @@
 
 So, here's the problem with AI coding agents: they can't feel when they're stuck. They'll retry the same broken fix five times because they can see each individual error but not the *pattern* of repeated failure. They'll read the same file three times in a session because context compaction wiped their memory of reading it. They'll chase a dependency chain four levels deep and forget what they were originally trying to fix. They have no sense of time, no peripheral vision of how their changes affect other files, and no awareness of whether they're actually validating their work or just admiring it.
 
-Metacog is a pair of Claude Code hooks that gives the agent a nervous system. One hook fires after every tool call and watches for these patterns. The other fires when you send a message and injects learned rules from past sessions. When everything is fine, both hooks are completely silent, zero tokens, zero cost. When something is off, a short signal appears in the agent's context. Not a command, just awareness. The agent's own reasoning decides what to do about it.
+Metacog is a pair of Claude Code hooks that gives the agent something like a nervous system. I say "something like" because the signals arrive as text in the agent's context, not as actual sensations. It's closer to a colleague leaving a post-it note than biological proprioception. But that turns out to be enough. One hook fires after every tool call and watches for these patterns. The other fires when you send a message and injects learned rules from past sessions. When everything is fine, both hooks are completely silent, zero tokens, zero cost. When something is off, a short signal appears in the agent's context. At first it's just awareness, and the agent's own reasoning decides what to do about it. But if the agent keeps failing, the signals escalate from gentle nudges to structured interventions that force the agent to stop and rethink. That escalation matters, because if the agent's reasoning was working properly it wouldn't be stuck in the first place.
 
-And when problems do resolve, the system extracts what changed and persists it as a behavioural rule that gets injected into future sessions. The clever bit is that rules get *stronger* when they work, not stale. If the agent stops making a mistake because the rule prevented it, that counts as evidence the rule is good. Most memory systems would see that silence and prune the rule. Metacog reinforces it.
+And when problems do resolve, the system extracts what changed and persists it as a behavioural rule that gets injected into future sessions. This is probably the most interesting part. Most cross-session memory systems use time-decay, so if a rule works and the failure stops happening, the system sees silence and prunes the rule. The agent forgets. The behaviour regresses. Metacog inverts this: if the rule was active and the failure's preconditions were met but the failure *didn't* happen, that counts as evidence the rule is working. Rules get stronger when they succeed, not stale.
 
 Seven senses. Session retrospectives. User interaction tracking. Zero dependencies. One-command install. Open source.
 
@@ -79,7 +79,7 @@ Metacog uses two hooks: `PostToolUse` for the nervous system and `UserPromptSubm
 
 ## What it does
 
-Metacog runs as a pair of Claude Code hooks. One fires after every tool call (the nervous system), the other fires on every user message (interaction tracking, digest injection, session retrospectives). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short signal appears in the agent's context. Not a command - just awareness. The agent's own reasoning decides what to do about it.
+Metacog runs as a pair of Claude Code hooks. One fires after every tool call (the nervous system), the other fires on every user message (interaction tracking, digest injection, session retrospectives). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short signal appears in the agent's context. Most of the time this is just awareness, and the agent decides what to do. But when the agent is genuinely stuck, the system escalates to structured interventions that force reflection before the agent can continue.
 
 ### The seven senses
 
@@ -170,12 +170,12 @@ Action mix: 14 reads, 0 writes, 5 executes
 
 ### User interaction tracking
 
-The `UserPromptSubmit` hook analyses each user message for specificity (file paths, line numbers, identifiers, error text) and tracks interaction patterns across the session. When patterns emerge, like vague prompts consistently leading to long autonomous runs, the system surfaces collaborative insights for both agent and user.
+The `UserPromptSubmit` hook analyses each user message for specificity (file paths, line numbers, identifiers, error text) and tracks interaction patterns across the session. This isn't about judging prompt quality. Vague prompts are appropriate for exploratory work. But when there's a measurable correlation between prompt style and session length in a specific project, that's worth surfacing. The system shows the data and lets you decide what to do with it.
 
 ```
 [Metacog — Collaboration Patterns]
-Recent prompts averaged 28 tool calls each. Consider breaking complex tasks
-into smaller prompts or adding mid-task check-ins.
+Sessions where prompts mentioned specific files averaged 12 tool calls.
+Sessions without averaged 38. This project may benefit from targeted prompts.
 ```
 
 ---
