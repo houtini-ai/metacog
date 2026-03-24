@@ -7,7 +7,7 @@
   <img src="assets/icon.png" alt="metacog" width="128">
 </p>
 
-**Memory remembers what happened. Metacog notices how you're thinking.** Memory plugins serve a real purpose — they persist context, preferences, and project knowledge across sessions. Metacog does something different: it gives your Claude Code agent real-time awareness of its own cognitive state. Six senses detect context overflow, stuck loops, validation bias, repeated errors, and circular actions before they spiral. And when problems resolve, the system learns what fixed them — building rules that get stronger over time, not stale. Zero dependencies. One-command install. Open source.
+**Memory remembers what happened. Metacog notices how you're thinking.** Memory plugins serve a real purpose — they persist context, preferences, and project knowledge across sessions. Metacog does something different: it gives your Claude Code agent real-time awareness of its own cognitive state. Seven senses detect context overflow, stuck loops, scope drift, validation bias, repeated errors, and circular actions before they spiral. Session retrospectives and user interaction tracking help both agent and human collaborate more effectively. And when problems resolve, the system learns what fixed them — building rules that get stronger over time, not stale. Zero dependencies. One-command install. Open source.
 
 ---
 
@@ -63,15 +63,15 @@ Hooks communicate back to Claude via JSON on stdout:
 
 If a hook outputs nothing and exits 0, it's invisible. Zero token cost. Zero latency (well, near-zero). This is what makes hooks different from MCP servers - they can be completely silent when there's nothing to say.
 
-Metacog uses two hooks: `PostToolUse` for the nervous system and `UserPromptSubmit` for injecting learned rules at session start.
+Metacog uses two hooks: `PostToolUse` for the nervous system and `UserPromptSubmit` for injecting learned rules, session retrospectives, and tracking user interaction patterns.
 
 ---
 
 ## What it does
 
-Metacog runs as a pair of Claude Code hooks. One fires after every tool call (the nervous system), the other fires once per session (the reinforcement injector). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short signal appears in the agent's context. Not a command - just awareness. The agent's own reasoning decides what to do about it.
+Metacog runs as a pair of Claude Code hooks. One fires after every tool call (the nervous system), the other fires on every user message (interaction tracking, digest injection, session retrospectives). When everything is normal, both produce zero output and cost zero tokens. When something is abnormal, a short signal appears in the agent's context. Not a command - just awareness. The agent's own reasoning decides what to do about it.
 
-### The six senses
+### The seven senses
 
 | Sense | Signal | What it detects |
 |-------|--------|-----------------|
@@ -81,6 +81,7 @@ Metacog runs as a pair of Claude Code hooks. One fires after every tool call (th
 | **Spatial** | Blast radius | File dependency count after writes |
 | **Vestibular** | Action diversity | Repeated identical actions — going in circles |
 | **Echo** | Validation bias | Writing code without running tests, or validating against own output instead of the project's test suite |
+| **Drift** | Scope drift | Recent actions have diverged from the original task — chasing dependency chains instead of solving the problem |
 
 ### The three layers
 
@@ -89,7 +90,7 @@ Metacog runs as a pair of Claude Code hooks. One fires after every tool call (th
 </div>
 
 **Layer 1: Proprioception** (always on, near-zero cost)
-Calculates all five senses after every tool call. Injects a signal only when values deviate from baseline. Most turns: completely silent.
+Calculates all seven senses after every tool call. Injects a signal only when values deviate from baseline. Most turns: completely silent.
 
 ```
 [Metacognition — review and ignore if not relevant]
@@ -140,11 +141,40 @@ Metacog inverts this. When a known pattern *doesn't* fire during a session where
   <img src="docs/reinforcement-tracking.png" alt="Reinforcement Tracking" width="700">
 </div>
 
+### Subagent awareness
+
+When the agent delegates work to a subagent, the subagent's tool calls can inflate turn counts and token velocity — triggering false positives from Chronos and O2. Metacog detects Agent tool calls and suppresses these senses during delegation, so productive delegation isn't penalised.
+
+### Session retrospectives
+
+At the start of each session, metacog injects a brief retrospective of the prior session: which senses fired, action distribution, nociceptive events, delegation patterns, and user interaction quality. This gives the agent immediate context about what happened before without needing to search history.
+
+```
+[Metacog — Prior Session Retrospective]
+Last session: 57 tool calls over 9 min.
+Senses that fired: O2 (context velocity), Chronos (level 2).
+1 subagent delegation used.
+Action mix: 14 reads, 0 writes, 5 executes
+2 user messages, avg 28 tool calls between messages — prompts were mostly broad/exploratory
+```
+
+### User interaction tracking
+
+The `UserPromptSubmit` hook analyses each user message for specificity (file paths, line numbers, identifiers, error text) and tracks interaction patterns across the session. When patterns emerge — like vague prompts consistently leading to long autonomous runs — the system surfaces collaborative insights for both agent and user.
+
+```
+[Metacog — Collaboration Patterns]
+Recent prompts averaged 28 tool calls each. Consider breaking complex tasks
+into smaller prompts or adding mid-task check-ins.
+```
+
 ---
 
 ## How the data flows
 
-**Session start** - the `UserPromptSubmit` hook compiles all learnings (global + project-scoped) into a digest and injects it as a system message. A marker file records which patterns were active.
+**Session start** - the `UserPromptSubmit` hook compiles all learnings (global + project-scoped) into a digest, builds a retrospective of the prior session, and injects both as a system message. A marker file records which patterns were active.
+
+**Every user message** - the `UserPromptSubmit` hook captures a task fingerprint (for scope drift detection) and records interaction metadata (prompt specificity, tool calls between messages, active signals).
 
 **During the session** - the `PostToolUse` hook fires after every tool call. It records actions into a rolling 20-item window. Silent when normal. Signals when abnormal.
 
@@ -197,6 +227,12 @@ Metacog works with zero configuration. To tune thresholds, create `.claude/metac
     "echo": {
       "write_streak_threshold": 5,
       "cooldown": 8
+    },
+    "drift": {
+      "min_actions": 8,
+      "recent_window": 5,
+      "drift_threshold": 0.15,
+      "cooldown": 10
     }
   },
   "nociception": {
@@ -215,6 +251,8 @@ Metacog works with zero configuration. To tune thresholds, create `.claude/metac
 | `spatial.blast_radius_threshold` | 5 | File imports before signalling |
 | `vestibular.consecutive_similar` | 4 | Identical actions before signalling |
 | `echo.write_streak_threshold` | 5 | Consecutive writes without test run before signalling |
+| `drift.min_actions` | 8 | Minimum actions before drift detection starts |
+| `drift.drift_threshold` | 0.15 | Term overlap ratio below which drift is signalled |
 
 ### Pattern detectors
 
@@ -273,18 +311,21 @@ metacog/
 │   └── hooks.json            # Hook event configuration
 ├── src/
 │   ├── hook.js               # PostToolUse - nervous system
-│   ├── digest-inject.js      # UserPromptSubmit - reinforcement injector
+│   ├── digest-inject.js      # UserPromptSubmit - digest + interaction tracking
 │   ├── lib/
 │   │   ├── config.js         # Configuration + defaults
 │   │   ├── learnings.js      # Cross-session pattern detection
-│   │   └── state.js          # Rolling action window + token estimation
+│   │   ├── state.js          # Rolling action window + token estimation
+│   │   ├── interactions.js   # User interaction analysis
+│   │   └── retrospective.js  # Session retrospective generation
 │   └── senses/
 │       ├── o2.js             # Context trend
 │       ├── chronos.js        # Temporal awareness
 │       ├── nociception.js    # Error friction + escalation
 │       ├── spatial.js        # Blast radius
 │       ├── vestibular.js     # Action diversity
-│       └── echo.js           # Validation bias
+│       ├── echo.js           # Validation bias
+│       └── drift.js          # Scope drift detection
 ├── assets/
 │   └── icon.png              # Plugin icon
 └── docs/                     # Diagrams

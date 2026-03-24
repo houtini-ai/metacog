@@ -26,6 +26,7 @@ import { evaluate as evaluateNociception, checkResolution } from './senses/nocic
 import { evaluate as evaluateSpatial } from './senses/spatial.js';
 import { evaluate as evaluateVestibular } from './senses/vestibular.js';
 import { evaluate as evaluateEcho } from './senses/echo.js';
+import { evaluate as evaluateDrift } from './senses/drift.js';
 import { join } from 'path';
 
 async function main() {
@@ -56,15 +57,26 @@ async function main() {
     // Append to rolling window (passes project scope for per-project learnings)
     state = appendAction(state, action, sessionId, projectScope, config);
 
-    // --- Evaluate all 5 senses ---
+    // --- Subagent awareness ---
+    // When the agent delegates to a subagent, the return is a single
+    // consolidated result — not a velocity spike or autonomous grinding.
+    // Suppress O2 and Chronos to avoid false positives on delegation.
+    const isDelegation = action.tool_name === 'Agent';
+    if (isDelegation) {
+      state.o2_cooldown = (config.proprioception.o2.cooldown || 8);
+      // Don't let subagent turn count inflate Chronos — reset the level
+      // so the next threshold fires relative to post-delegation state
+    }
+
+    // --- Evaluate senses ---
     const signals = [];
 
-    // 1. O2 - Context Trend
+    // 1. O2 - Context Trend (suppressed after delegation)
     const o2Signal = evaluateO2(state, action, config.proprioception);
     if (o2Signal) signals.push({ sense: 'O2', message: o2Signal });
 
-    // 2. Chronos - Temporal Awareness
-    const chronosSignal = evaluateChronos(state, action, config.proprioception);
+    // 2. Chronos - Temporal Awareness (suppressed during delegation)
+    const chronosSignal = isDelegation ? null : evaluateChronos(state, action, config.proprioception);
     if (chronosSignal) signals.push({ sense: 'Chronos', message: chronosSignal });
 
     // 3. Nociception - Error Friction (has Layer 1 + Layer 2)
@@ -82,6 +94,15 @@ async function main() {
     // 6. Echo - Validation Bias
     const echoSignal = evaluateEcho(state, action, config.proprioception);
     if (echoSignal) signals.push({ sense: 'Echo', message: echoSignal });
+
+    // 7. Drift - Scope Drift
+    const driftSignal = evaluateDrift(state, action, config.proprioception);
+    if (driftSignal) signals.push({ sense: 'Drift', message: driftSignal });
+
+    // --- Track which senses fired (persists for retrospective) ---
+    for (const s of signals) {
+      state[`_${s.sense.toLowerCase()}_fired`] = true;
+    }
 
     // --- Check for nociceptive resolution (Layer 3: Motor Learning) ---
     if (checkResolution(state)) {

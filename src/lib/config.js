@@ -35,6 +35,12 @@ const DEFAULTS = {
       write_streak_threshold: 5,   // consecutive writes without test run before signal
       cooldown: 8,                 // turns of silence after firing
     },
+    drift: {
+      min_actions: 8,              // minimum actions before drift detection starts
+      recent_window: 5,            // recent actions to compare against fingerprint
+      drift_threshold: 0.15,       // overlap ratio below which drift is signalled
+      cooldown: 10,                // turns of silence after firing
+    },
   },
   nociception: {
     escalation_cooldown: 5,        // turns of silence after intervention

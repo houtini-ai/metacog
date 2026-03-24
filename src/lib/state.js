@@ -182,6 +182,9 @@ export function appendAction(state, action, sessionId, projectScope, config = nu
   if ((state.echo_cooldown || 0) > 0) {
     state.echo_cooldown--;
   }
+  if ((state.drift_cooldown || 0) > 0) {
+    state.drift_cooldown--;
+  }
 
   return state;
 }

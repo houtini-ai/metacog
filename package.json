@@ -1,7 +1,7 @@
 {
   "name": "@houtini/metacog",
-  "version": "0.4.1",
-  "description": "Real-time metacognition for Claude Code. Six senses detect stuck loops, validation bias, repeated errors, and circular actions. Learns what works across sessions.",
+  "version": "0.5.0",
+  "description": "Real-time metacognition for Claude Code. Seven senses detect stuck loops, scope drift, validation bias, repeated errors, and circular actions. Session retrospectives and user interaction tracking for better human-agent collaboration. Learns what works across sessions.",
   "type": "module",
   "main": "src/hook.js",
   "bin": {
