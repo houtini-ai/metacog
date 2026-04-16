@@ -1,7 +1,6 @@
 # metacog
 
 [![npm version](https://img.shields.io/npm/v/@houtini/metacog.svg?style=flat-square)](https://www.npmjs.com/package/@houtini/metacog)
-[![Known Vulnerabilities](https://snyk.io/test/github/houtini-ai/metacog/badge.svg)](https://snyk.io/test/github/houtini-ai/metacog)
 
 <p align="center">
   <img src="assets/icon.png" alt="metacog" width="128">
